@@ -518,15 +518,15 @@ function handleSearch() {
 function renderSearchResults(results, q) {
   const el = document.getElementById('bookList');
   if (!results.length) { el.innerHTML = '<div class="empty"><span class="e">🔍</span>未找到匹配内容</div>'; return; }
-  let html = '<div style="padding:4px 8px;font-size:9px;color:var(--wn);margin-bottom:4px">📖 内容搜索结果</div>';
+  let html = '<div style="padding:4px 8px;font-size:9px;color:var(--wn);margin-bottom:4px;cursor:pointer" onclick="loadBooks();handleSearch()">📖 内容搜索结果 · 点击返回书库</div>';
   results.forEach(b => {
-    html += `<div class="bk" onclick="selectBook('${b.id}')">
+    html += `<div class="bk" onclick="curBook=null;currentBookData=null;selectBook('${b.id}')">
       <span class="bi">📖</span>
-      <div style="flex:1;min-width:0"><div class="bn">${esc(b.title)}</div><div class="bm">${b.author?esc(b.author)+' · ':''}${b.chapter_count}章</div></div>
+      <div style="flex:1;min-width:0"><div class="bn">${esc(b.title)}</div><div class="bm">${b.author?esc(b.author)+' · ':''}${b.chapter_count||0}章</div></div>
     </div>`;
     if (b.matched_chapters && b.matched_chapters.length) {
       b.matched_chapters.slice(0, 3).forEach(ch => {
-        html += `<div class="ch" onclick="event.stopPropagation();loadChapterById('${b.id}','${ch.id}')" style="background:var(--sf2)">
+        html += `<div class="ch" onclick="event.stopPropagation();curBook=null;currentBookData=null;selectBookAndChapter('${b.id}','${ch.id}')" style="background:var(--sf2)">
           <span class="ch-t">${esc(ch.title)}</span>
           <span style="font-size:9px;color:var(--wn);margin-left:4px">命中</span>
         </div>
@@ -559,7 +559,7 @@ function dropChapter(e, targetIdx) {
 
   const chEls = Array.from(document.querySelectorAll('.ch[draggable=true]'));
   const chIds = chEls.map(el => {
-    const m = el.getAttribute('onclick').match(/'(ch_seed[^']+)'/);
+    const m = el.getAttribute('onclick').match(/'(ch_[^']+)'/);
     return m ? m[1] : null;
   }).filter(Boolean);
 
@@ -623,6 +623,12 @@ function loadChapterById(bookId, chId) {
   toast(`已加载「${ch.title}」`,'ok');
 }
 
+async function selectBookAndChapter(bookId, chId) {
+  await selectBook(bookId);
+  // 等待 DOM 更新后加载章节
+  setTimeout(() => loadChapterById(bookId, chId), 100);
+}
+
 // ===== 编辑器按钮更新 =====
 function updateEditorButtons() {
   const saveBtn = document.getElementById('saveChBtn');
@@ -663,16 +669,20 @@ async function saveChapterContent() {
 // ===== 应用翻改结果到章节 =====
 async function applyResultToChapter() {
   if (!curBook || !curCh) { toast('请先选择章节','wn'); return; }
-  const resultText = document.getElementById('resultText').textContent;
+  const resultEl = document.getElementById('resultText');
+  const resultText = resultEl.textContent;
   if (!resultText || resultText === '等待翻改...' || resultText === '无翻改结果') {
     toast('没有可应用的结果','wn'); return;
   }
+  // 提取纯文本（去除高亮标记）
   const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = document.getElementById('resultText').innerHTML;
+  tempDiv.innerHTML = resultEl.innerHTML;
   const cleanText = tempDiv.textContent || tempDiv.innerText || resultText;
 
   document.getElementById('origText').value = cleanText;
+  updateCnt();
   await saveChapterContent();
+  toast('翻改结果已应用到章节','ok');
 }
 
 // ===== 删除 =====
@@ -900,19 +910,24 @@ function handleFile(event) {
 
 // ===== 下载 =====
 function downloadResult() {
-  const t = document.getElementById('resultText').textContent;
+  const resultEl = document.getElementById('resultText');
+  const t = resultEl.textContent;
   if (!t || t==='等待翻改...') { toast('没有可下载的内容','wn'); return; }
-  let content = t;
-  if (bookRewriteResult && bookRewriteResult.chapters && bookRewriteResult.chapters.length > 1) {
+  let content, fileName;
+  if (bookRewriteResult && bookRewriteResult.chapters && bookRewriteResult.chapters.length > 0) {
     content = `《${bookRewriteResult.book_title}》翻改结果\n${'='.repeat(40)}\n\n`;
     bookRewriteResult.chapters.forEach(ch => {
       content += `${ch.title}\n${'-'.repeat(30)}\n${ch.rewritten}\n\n`;
     });
+    fileName = `${bookRewriteResult.book_title}_翻改结果_${new Date().toISOString().slice(0,10)}.txt`;
+  } else {
+    content = t;
+    const chName = currentChTitle ? `_${currentChTitle}` : '';
+    fileName = `翻改结果${chName}_${new Date().toISOString().slice(0,10)}.txt`;
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([content],{type:'text/plain;charset=utf-8'}));
-  const bookName = bookRewriteResult ? `_${bookRewriteResult.book_title}` : '';
-  a.download = `${bookName}翻改结果_${new Date().toISOString().slice(0,10)}.txt`;
+  a.download = fileName;
   a.click();
   toast('已下载','ok');
 }
@@ -963,10 +978,15 @@ function renderResult(data) {
   const el = document.getElementById('resultText');
   let html = esc(data.rewritten);
   if (data.replacements) {
-    data.replacements.forEach(rp => {
-      if (rp.original === '⚠️') return;
+    // 按替换词长度降序排列，避免短词先匹配导致长词被截断
+    const sorted = data.replacements.filter(rp => rp.original !== '⚠️').sort((a,b) => b.replacement.length - a.replacement.length);
+    const highlighted = new Set();
+    sorted.forEach(rp => {
       const rEsc = esc(rp.replacement);
-      html = html.split(rEsc).join(`<span class="diff-new">${rEsc}</span>`);
+      if (!highlighted.has(rEsc)) {
+        html = html.split(rEsc).join(`<span class="diff-new">${rEsc}</span>`);
+        highlighted.add(rEsc);
+      }
     });
   }
   el.innerHTML = html;
@@ -1030,8 +1050,11 @@ async function rewriteBookStream() {
 }
 
 // SSE流式翻改单章
+let streamRenderTimer = null;
+
 function streamRewriteChapter(ch, rules, intensity, apiKey, provider) {
   return new Promise(async (resolve) => {
+    streamRenderTimer = null;
     try {
       const body = JSON.stringify({
         text: ch.content, rules, use_ai: true, ai_intensity: intensity,
@@ -1060,7 +1083,19 @@ function streamRewriteChapter(ch, rules, intensity, apiKey, provider) {
             const data = JSON.parse(dataStr);
             if (data.type === 'chunk') {
               fullText += data.content;
-              document.getElementById('resultText').innerHTML = `<div style="font-size:11px;color:var(--pm)">正在翻改：${esc(ch.title)}</div><div style="margin-top:8px">${esc(fullText)}</div>`;
+              if (!streamRenderTimer) {
+                streamRenderTimer = setTimeout(() => {
+                  const el = document.getElementById('resultText');
+                  const statusDiv = el.querySelector('div');
+                  const contentDiv = statusDiv ? statusDiv.nextElementSibling : null;
+                  if (contentDiv) {
+                    contentDiv.textContent = fullText;
+                  } else {
+                    el.innerHTML = `<div style="font-size:11px;color:var(--pm)">正在翻改：${esc(ch.title)}</div><div style="margin-top:8px">${esc(fullText)}</div>`;
+                  }
+                  streamRenderTimer = null;
+                }, 100);
+              }
             } else if (data.type === 'done') {
               let rewritten = data.rewritten || fullText;
               let repDetails = data.replacements || [];
@@ -1078,6 +1113,7 @@ function streamRewriteChapter(ch, rules, intensity, apiKey, provider) {
         }
       }
     } catch(e) { console.error(e); }
+    if (streamRenderTimer) { clearTimeout(streamRenderTimer); streamRenderTimer = null; }
     resolve();
   });
 }
@@ -1142,8 +1178,8 @@ async function fetchVersion() {
   try {
     const r = await fetch(`${API}/api/health`);
     const d = await r.json();
-    document.getElementById('verBadge').textContent = d.version || '6.1';
-  } catch(e) { document.getElementById('verBadge').textContent = '6.1'; }
+    document.getElementById('verBadge').textContent = d.version || '6.2';
+  } catch(e) { document.getElementById('verBadge').textContent = '6.2'; }
 }
 
 // ===== 复制功能 =====
