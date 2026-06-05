@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小说翻改工具 - 管理后台</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a14;--sf:#12121e;--sf2:#1a1a2e;--sf3:#222240;--bd:#2a2a4a;--tx:#e0e0e0;--tx2:#999;--tx3:#555;--pm:#7c5cfc;--pm2:#5a3fd6;--ac:#ff6b9d;--ok:#4ecdc4;--wn:#ffe66d;--dg:#ff6b6b}
+body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh}
+.login-box{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:32px;width:360px;max-width:90vw}
+.login-box h1{font-size:1.2em;text-align:center;margin-bottom:6px;background:linear-gradient(135deg,var(--pm),var(--ac));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.login-box p{text-align:center;color:var(--tx2);font-size:12px;margin-bottom:16px}
+.login-box input{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:10px 14px;color:var(--tx);font-size:14px;margin-bottom:12px}
+.login-box input:focus{outline:none;border-color:var(--pm)}
+.login-box .btn{width:100%;padding:10px;font-size:14px}
+
+.admin{display:none}
+.admin.show{display:block}
+.topbar{background:var(--sf);border-bottom:1px solid var(--bd);padding:10px 16px;display:flex;align-items:center;gap:12px}
+.topbar h1{font-size:1em;background:linear-gradient(135deg,var(--pm),var(--ac));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar a{color:var(--pm);font-size:12px;text-decoration:none}
+.topbar .logout{margin-left:auto;color:var(--dg);cursor:pointer;font-size:12px}
+
+.content{max-width:1200px;margin:20px auto;padding:0 16px}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:16px}
+.stat-card .label{font-size:11px;color:var(--tx2);margin-bottom:4px}
+.stat-card .value{font-size:1.8em;font-weight:bold;background:linear-gradient(135deg,var(--pm),var(--ac));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat-card .sub{font-size:10px;color:var(--tx3);margin-top:2px}
+
+.section{background:var(--sf);border:1px solid var(--bd);border-radius:8px;margin-bottom:16px}
+.section-h{padding:10px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between}
+.section-h h2{font-size:.85em}
+.section-b{padding:14px}
+
+.btn{padding:6px 14px;border:none;border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s;font-weight:500;display:inline-flex;align-items:center;gap:4px}
+.btn:active{transform:scale(.97)}
+.btn-p{background:linear-gradient(135deg,var(--pm),var(--pm2));color:#fff}
+.btn-g{background:var(--sf3);color:var(--tx);border:1px solid var(--bd)}
+.btn-a{background:linear-gradient(135deg,var(--ac),#ff4d8a);color:#fff}
+.btn-ok{background:var(--ok);color:var(--bg)}
+.btn-d{background:var(--dg);color:#fff}
+.btn-sm{padding:4px 8px;font-size:11px}
+.btn-xs{padding:2px 6px;font-size:10px}
+
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--bd);font-size:12px}
+th{color:var(--tx2);font-weight:500;font-size:11px}
+tr:hover td{background:var(--sf2)}
+
+.book-row{cursor:pointer}
+.book-row .arrow{color:var(--tx3);font-size:10px;margin-right:4px;transition:transform .15s}
+.book-row.expanded .arrow{transform:rotate(90deg)}
+.ch-table{display:none;background:var(--sf2);margin:0 -10px}
+.ch-table.show{display:table-row}
+.ch-table td{padding-left:32px}
+
+.edit-area{margin-top:12px}
+.edit-area textarea{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px;color:var(--tx);font-size:12px;height:200px;resize:vertical;font-family:inherit}
+.edit-area textarea:focus{outline:none;border-color:var(--pm)}
+.edit-area input{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px;color:var(--tx);font-size:12px;margin-bottom:8px}
+.edit-area input:focus{outline:none;border-color:var(--pm)}
+
+.toast{position:fixed;top:12px;right:12px;padding:8px 16px;border-radius:6px;font-size:12px;z-index:2000;transform:translateX(120%);transition:transform .25s}
+.toast.show{transform:translateX(0)}
+.toast-ok{background:var(--ok);color:var(--bg)}
+.toast-err{background:var(--dg);color:#fff}
+
+.ld{position:fixed;inset:0;background:rgba(10,10,20,.8);display:none;align-items:center;justify-content:center;z-index:1000;flex-direction:column;gap:10px}
+.ld.show{display:flex}
+.spin{width:28px;height:28px;border:3px solid var(--bd);border-top-color:var(--pm);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- 登录 -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-box">
+    <h1>📖 管理后台</h1>
+    <p>小说翻改工具 v4.1</p>
+    <input type="password" id="pwdInput" placeholder="管理员密码" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn btn-p" onclick="doLogin()">登录</button>
+  </div>
+</div>
+
+<!-- 管理界面 -->
+<div class="admin" id="adminWrap">
+  <div class="topbar">
+    <h1>📖 管理后台</h1>
+    <a href="/">← 返回前台</a>
+    <span class="logout" onclick="doLogout()">退出登录</span>
+  </div>
+  <div class="content">
+    <!-- 统计卡片 -->
+    <div class="stats" id="statsArea"></div>
+
+    <!-- 操作区 -->
+    <div class="section">
+      <div class="section-h"><h2>⚡ 快捷操作</h2></div>
+      <div class="section-b" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-p" onclick="refreshData()">🔄 刷新数据</button>
+        <button class="btn btn-a" onclick="reseedData()">🌱 重置种子数据</button>
+        <button class="btn btn-ok" onclick="showAddBook()">➕ 新建书籍</button>
+        <button class="btn btn-g" onclick="showAddChapter()">📝 批量添加章节</button>
+      </div>
+    </div>
+
+    <!-- 书库管理 -->
+    <div class="section">
+      <div class="section-h">
+        <h2>📚 书库管理</h2>
+        <div><input id="adminSearch" placeholder="搜索..." style="background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:4px 8px;color:var(--tx);font-size:11px;width:140px" oninput="renderBooks()"></div>
+      </div>
+      <div class="section-b" style="padding:0">
+        <table>
+          <thead><tr><th style="width:30px"></th><th>书名</th><th>作者</th><th>章节</th><th>字数</th><th>更新时间</th><th>操作</th></tr></thead>
+          <tbody id="booksTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 规则模板 -->
+    <div class="section">
+      <div class="section-h"><h2>💾 规则模板</h2></div>
+      <div class="section-b" style="padding:0">
+        <table>
+          <thead><tr><th>模板名</th><th>规则数</th><th>创建时间</th><th>操作</th></tr></thead>
+          <tbody id="rulesTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ld" id="ldBg"><div class="spin"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let token = localStorage.getItem('nr_admin_token') || '';
+let allBooks = [];
+let allRules = [];
+
+// ====== 登录 ======
+async function doLogin() {
+  const pwd = document.getElementById('pwdInput').value;
+  if (!pwd) return;
+  try {
+    const r = await fetch(`${API}/api/admin/login`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({password: pwd})
+    });
+    if (!r.ok) { toast('密码错误','err'); return; }
+    const d = await r.json();
+    token = d.token;
+    localStorage.setItem('nr_admin_token', token);
+    showAdmin();
+  } catch(e) { toast('登录失败','err'); }
+}
+function doLogout() {
+  token = '';
+  localStorage.removeItem('nr_admin_token');
+  document.getElementById('loginWrap').style.display = 'flex';
+  document.getElementById('adminWrap').classList.remove('show');
+}
+
+async function showAdmin() {
+  document.getElementById('loginWrap').style.display = 'none';
+  document.getElementById('adminWrap').classList.add('show');
+  await refreshData();
+}
+
+// ====== 数据加载 ======
+async function refreshData() {
+  showLd();
+  try {
+    const [stats, books, rules] = await Promise.all([
+      fetch(`${API}/api/admin/stats?token=${token}`).then(r => r.json()),
+      fetch(`${API}/api/books`).then(r => r.json()),
+      fetch(`${API}/api/rules`).then(r => r.json())
+    ]);
+    renderStats(stats);
+    allBooks = books.books || [];
+    allRules = rules.rules || [];
+    renderBooks();
+    renderRules();
+  } catch(e) { if (e.message?.includes('401')) doLogout(); }
+  finally { hideLd(); }
+}
+
+function renderStats(s) {
+  document.getElementById('statsArea').innerHTML = `
+    <div class="stat-card"><div class="label">📚 书籍</div><div class="value">${s.book_count}</div><div class="sub">共${s.chapter_count}章</div></div>
+    <div class="stat-card"><div class="label">📖 总字数</div><div class="value">${(s.total_chars/10000).toFixed(1)}万</div><div class="sub">平均${s.chapter_count?Math.round(s.total_chars/s.chapter_count):0}字/章</div></div>
+    <div class="stat-card"><div class="label">💾 模板</div><div class="value">${s.template_count}</div><div class="sub">规则模板数</div></div>
+    <div class="stat-card"><div class="label">📊 平均章节</div><div class="value">${s.book_count?Math.round(s.chapter_count/s.book_count*10)/10:0}</div><div class="sub">章/书</div></div>
+  `;
+}
+
+function renderBooks() {
+  const q = (document.getElementById('adminSearch')?.value || '').toLowerCase();
+  const filtered = q ? allBooks.filter(b => b.title.toLowerCase().includes(q) || (b.author||'').toLowerCase().includes(q)) : allBooks;
+  const tb = document.getElementById('booksTbody');
+  if (!filtered.length) { tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--tx3)">暂无书籍</td></tr>'; return; }
+  let html = '';
+  filtered.forEach((b, idx) => {
+    // 计算字数
+    const full = allBooks.find(x => x.id === b.id);
+    const chars = full?._chars || 0;
+    const chCount = b.chapter_count || 0;
+    html += `<tr class="book-row" id="brow_${b.id}" onclick="toggleBookDetail('${b.id}')">
+      <td><span class="arrow">▶</span></td>
+      <td>${esc(b.title)}</td><td>${esc(b.author||'-')}</td><td>${chCount}</td>
+      <td>${chars>0?chars.toLocaleString():'-'}</td>
+      <td>${b.updated_at||'-'}</td>
+      <td><button class="btn btn-d btn-xs" onclick="event.stopPropagation();deleteBook('${b.id}')">删除</button></td>
+    </tr>
+    <tr class="ch-table" id="cdetail_${b.id}"><td colspan="7">
+      <div id="chcontent_${b.id}" style="padding:8px 0;color:var(--tx3);font-size:11px">加载中...</div>
+    </td></tr>`;
+  });
+  tb.innerHTML = html;
+}
+
+async function toggleBookDetail(bookId) {
+  const row = document.getElementById(`brow_${bookId}`);
+  const detail = document.getElementById(`cdetail_${bookId}`);
+  const isExpanded = row.classList.toggle('expanded');
+  detail.classList.toggle('show', isExpanded);
+  if (isExpanded) {
+    const chcontent = document.getElementById(`chcontent_${bookId}`);
+    if (chcontent.textContent === '加载中...') {
+      try {
+        const r = await fetch(`${API}/api/books/${bookId}`);
+        const book = await r.json();
+        let chHtml = '<table style="width:100%"><thead><tr><th>章节</th><th>字数</th><th>操作</th></tr></thead><tbody>';
+        (book.chapters||[]).forEach(ch => {
+          chHtml += `<tr><td>${esc(ch.title)}</td><td>${ch.content.length}</td>
+            <td><button class="btn btn-g btn-xs" onclick="editChapter('${bookId}','${ch.id}')">编辑</button>
+            <button class="btn btn-d btn-xs" onclick="deleteChapter('${bookId}','${ch.id}')">删除</button></td></tr>`;
+        });
+        chHtml += '</tbody></table>';
+        chcontent.innerHTML = chHtml;
+      } catch(e) { chcontent.textContent = '加载失败'; }
+    }
+  }
+}
+
+function renderRules() {
+  const tb = document.getElementById('rulesTbody');
+  if (!allRules.length) { tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--tx3)">暂无模板</td></tr>'; return; }
+  let html = '';
+  allRules.forEach(r => {
+    html += `<tr><td>${esc(r.name)}</td><td>${r.rules.length}</td><td>${r.created_at||'-'}</td>
+      <td><button class="btn btn-d btn-xs" onclick="deleteRule('${r.id}')">删除</button></td></tr>`;
+  });
+  tb.innerHTML = html;
+}
+
+// ====== 操作 ======
+async function deleteBook(id) {
+  if (!confirm('确定删除此书？')) return;
+  await fetch(`${API}/api/books/${id}`, {method:'DELETE'});
+  toast('已删除','ok'); refreshData();
+}
+async function deleteChapter(bookId, chId) {
+  if (!confirm('确定删除此章节？')) return;
+  await fetch(`${API}/api/books/${bookId}/chapters/${chId}`, {method:'DELETE'});
+  toast('已删除','ok'); refreshData();
+}
+async function deleteRule(id) {
+  if (!confirm('确定删除此模板？')) return;
+  await fetch(`${API}/api/rules/${id}`, {method:'DELETE'});
+  toast('已删除','ok'); refreshData();
+}
+
+async function reseedData() {
+  if (!confirm('重置种子数据将清除所有书籍，恢复为初始31本。确定？')) return;
+  showLd();
+  try {
+    const r = await fetch(`${API}/api/admin/seed?token=${token}`, {method:'POST'});
+    const d = await r.json();
+    toast(`已重置，${d.book_count}本书`,'ok');
+    refreshData();
+  } catch(e) { toast('重置失败','err'); }
+  finally { hideLd(); }
+}
+
+function showAddBook() {
+  const title = prompt('书名：');
+  if (!title) return;
+  const author = prompt('作者（选填）：') || '';
+  fetch(`${API}/api/books`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({title, author, chapters:[]})
+  }).then(() => { toast('已创建','ok'); refreshData(); });
+}
+
+function showAddChapter() {
+  // 先列出所有书供选择
+  let msg = '输入书序号：\n';
+  allBooks.forEach((b,i) => msg += `${i+1}. ${b.title}\n`);
+  const idx = parseInt(prompt(msg));
+  if (isNaN(idx) || idx < 1 || idx > allBooks.length) return;
+  const bookId = allBooks[idx-1].id;
+  const title = prompt('章节标题：');
+  if (!title) return;
+  const content = prompt('章节内容：');
+  if (!content) return;
+  fetch(`${API}/api/books/${bookId}/chapters`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({title, content})
+  }).then(() => { toast('已添加','ok'); refreshData(); });
+}
+
+async function editChapter(bookId, chId) {
+  try {
+    const r = await fetch(`${API}/api/books/${bookId}`);
+    const book = await r.json();
+    const ch = (book.chapters||[]).find(c => c.id === chId);
+    if (!ch) return;
+    const newTitle = prompt('章节标题：', ch.title);
+    if (!newTitle) return;
+    const newContent = prompt('章节内容：', ch.content);
+    if (newContent === null) return;
+    await fetch(`${API}/api/books/${bookId}/chapters/${chId}`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({title: newTitle, content: newContent})
+    });
+    toast('已更新','ok');
+    // 清除缓存重新加载
+    const el = document.getElementById(`chcontent_${bookId}`);
+    if (el) el.textContent = '加载中...';
+    toggleBookDetail(bookId);
+    toggleBookDetail(bookId);
+    toggleBookDetail(bookId);
+  } catch(e) { toast('编辑失败','err'); }
+}
+
+// ====== 工具 ======
+function toast(msg,type='ok') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast toast-${type} show`; setTimeout(()=>t.classList.remove('show'),2500); }
+function showLd() { document.getElementById('ldBg').classList.add('show'); }
+function hideLd() { document.getElementById('ldBg').classList.remove('show'); }
+function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// 自动登录
+if (token) { showAdmin(); }
+</script>
+</body>
+</html>
