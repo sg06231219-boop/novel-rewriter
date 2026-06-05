@@ -1,0 +1,16 @@
+{
+  "name": "小说翻改工具",
+  "short_name": "小说翻改",
+  "description": "AI辅助小说翻改工具 - 名称替换+AI句式改写",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a14",
+  "theme_color": "#7c5cfc",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
