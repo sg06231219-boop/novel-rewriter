@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""小说翻改工具 v5.0 — 全方位优化版
-新功能：多AI后端、物品名提取、CORS、文件导入、规则清空、
+"""小说翻改工具 v6.0 — 全方位优化版
+新功能：SSE流式AI翻改、章节拖拽排序、书库搜索API、
+      对比模式切换、快捷键增强、PWA支持、Rate Limiting、
+      多AI后端、物品名提取、CORS、文件导入、规则清空、
       字体调节、主题切换、本地暂存、差异高亮修复、
       AI改写后再做名称替换、移动端适配、管理员后台、
       31本书每本5章扩充、整本书一键翻改、
       同步滚动、复制按钮、进度条"""
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Optional
@@ -16,14 +18,35 @@ import uvicorn
 import re
 import json
 import os
+import time
 import httpx
 from collections import Counter
 from datetime import datetime
 # chardet removed - not needed
 
-app = FastAPI(title="小说翻改工具 v5.0")
+app = FastAPI(title="小说翻改工具 v6.0")
 
 ADMIN_PWD = os.environ.get("ADMIN_PASSWORD", "admin123")
+
+# ============ Rate Limiting ============
+_rate_limit_store: Dict[str, list] = {}
+RATE_LIMIT_WINDOW = 60  # 1分钟窗口
+RATE_LIMIT_MAX = 30     # 每窗口最大请求数
+
+
+def _check_rate_limit(client_ip: str):
+    """滑动窗口速率限制"""
+    now = time.time()
+    if client_ip not in _rate_limit_store:
+        _rate_limit_store[client_ip] = []
+    # 清理过期记录
+    _rate_limit_store[client_ip] = [
+        t for t in _rate_limit_store[client_ip]
+        if now - t < RATE_LIMIT_WINDOW
+    ]
+    if len(_rate_limit_store[client_ip]) >= RATE_LIMIT_MAX:
+        raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
+    _rate_limit_store[client_ip].append(now)
 
 # CORS
 app.add_middleware(
@@ -114,8 +137,9 @@ def apply_rules(text: str, rules: List[ReplaceRule]) -> tuple:
     return result, rep_details
 
 
-def call_ai(prompt: str, api_key: str, provider: str) -> str:
-    """统一AI调用入口，支持智谱 / DeepSeek / OpenAI兼容"""
+def call_ai(prompt: str, api_key: str, provider: str, stream: bool = False):
+    """统一AI调用入口，支持智谱 / DeepSeek / OpenAI兼容
+    stream=True时返回生成器，yield每个chunk的content"""
     if provider == "zhipu":
         url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
         model = "glm-4-flash"
@@ -136,14 +160,37 @@ def call_ai(prompt: str, api_key: str, provider: str) -> str:
         "temperature": 0.7,
         "max_tokens": 4096,
     }
-    with httpx.Client(timeout=120) as client:
-        resp = client.post(url, headers=headers, json=payload)
-        resp.raise_for_status()
-    data = resp.json()
-    # 兼容两种返回格式
-    if "choices" in data:
-        return data["choices"][0]["message"]["content"]
-    raise ValueError("AI 返回格式异常")
+    if stream:
+        payload["stream"] = True
+
+    if stream:
+        def generate():
+            with httpx.Client(timeout=120) as client:
+                with client.stream("POST", url, headers=headers, json=payload) as resp:
+                    resp.raise_for_status()
+                    for line in resp.iter_lines():
+                        if not line or not line.startswith("data: "):
+                            continue
+                        data_str = line[6:]
+                        if data_str.strip() == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data_str)
+                            delta = chunk.get("choices", [{}])[0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                yield content
+                        except json.JSONDecodeError:
+                            continue
+        return generate()
+    else:
+        with httpx.Client(timeout=120) as client:
+            resp = client.post(url, headers=headers, json=payload)
+            resp.raise_for_status()
+        data = resp.json()
+        if "choices" in data:
+            return data["choices"][0]["message"]["content"]
+        raise ValueError("AI 返回格式异常")
 
 
 def ai_rewrite(text: str, api_key: str,
@@ -307,7 +354,8 @@ async def root():
 
 
 @app.post("/api/rewrite", response_model=RewriteResponse)
-async def rewrite_text(req: RewriteRequest):
+async def rewrite_text(req: RewriteRequest, request: Request):
+    _check_rate_limit(request.client.host if request.client else "0.0.0.0")
     try:
         original = req.text
         # 流程：先AI改写 → 再做名称替换（这样替换规则可以覆盖AI输出）
@@ -341,11 +389,157 @@ async def rewrite_text(req: RewriteRequest):
 
 
 @app.post("/api/extract")
-async def extract_names(req: ExtractRequest):
+async def extract_names(req: ExtractRequest, request: Request):
+    _check_rate_limit(request.client.host if request.client else "0.0.0.0")
     try:
         return {"names": extract_names_rule_based(req.text)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ SSE流式翻改 ============
+
+@app.post("/api/rewrite/stream")
+async def rewrite_stream(req: RewriteRequest, request: Request):
+    """SSE流式AI翻改，实时返回生成内容"""
+    _check_rate_limit(request.client.host if request.client else "0.0.0.0")
+
+    if not req.use_ai or not req.api_key:
+        raise HTTPException(status_code=400, detail="流式翻改需要启用AI并提供API Key")
+
+    async def event_generator():
+        import asyncio
+        try:
+            yield f"data: {json.dumps({'type': 'status', 'msg': 'AI改写中...'}, ensure_ascii=False)}\n\n"
+
+            desc = {
+                "light": "轻微改写，只替换部分词汇，保持句式结构",
+                "medium": "中等改写，变换句式和表达，保持剧情不变",
+                "heavy": "大幅改写，换叙述风格，保持剧情框架不变"
+            }
+            prompt = f"""你是专业小说改写师。要求：
+1. {desc.get(req.ai_intensity, desc['medium'])}
+2. 剧情完全不变，人物/地点/物品名称不变
+3. 保持原有文风
+4. 不添加不删减内容
+5. 只输出改写后的文本，不要解释
+
+原文：
+{req.text}"""
+
+            stream_gen = call_ai(prompt, req.api_key, req.ai_provider, stream=True)
+            full_text = ""
+            for chunk in stream_gen:
+                full_text += chunk
+                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(0)
+
+            rewritten, rep_details = apply_rules(full_text, req.rules)
+            total = sum(r["count"] for r in rep_details)
+            yield f"data: {json.dumps({'type': 'done', 'rewritten': rewritten, 'replacements': rep_details, 'replace_count': total}, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'msg': str(e)}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# ============ 搜索 API ============
+
+@app.get("/api/books/search")
+async def search_books(q: str = "", scope: str = "title"):
+    """搜索书库，scope: title(书名)/content(内容)"""
+    if not q:
+        return {"results": []}
+    books = _load_json(BOOKS_FILE, [])
+    results = []
+    for b in books:
+        if scope == "title":
+            if q.lower() in b["title"].lower() or q.lower() in b.get("author", "").lower():
+                results.append({
+                    "id": b["id"],
+                    "title": b["title"],
+                    "author": b.get("author", ""),
+                    "chapter_count": len(b.get("chapters", [])),
+                })
+        elif scope == "content":
+            matched_chapters = []
+            for ch in b.get("chapters", []):
+                if q in ch.get("content", "") or q in ch.get("title", ""):
+                    content = ch.get("content", "")
+                    idx = content.find(q)
+                    snippet = content[max(0, idx - 30):idx + len(q) + 30] if idx >= 0 else ch.get("title", "")
+                    matched_chapters.append({
+                        "id": ch["id"],
+                        "title": ch["title"],
+                        "snippet": snippet.replace(q, f"【{q}】"),
+                    })
+            if matched_chapters:
+                results.append({
+                    "id": b["id"],
+                    "title": b["title"],
+                    "author": b.get("author", ""),
+                    "matched_chapters": matched_chapters,
+                })
+    return {"results": results, "total": len(results)}
+
+
+# ============ 章节排序 API ============
+
+class ChapterReorder(BaseModel):
+    chapter_ids: List[str]
+
+
+@app.put("/api/books/{book_id}/chapters/reorder")
+async def reorder_chapters(book_id: str, req: ChapterReorder):
+    """拖拽排序章节"""
+    books = _load_json(BOOKS_FILE, [])
+    for b in books:
+        if b["id"] == book_id:
+            ch_map = {ch["id"]: ch for ch in b.get("chapters", [])}
+            new_chapters = []
+            for cid in req.chapter_ids:
+                if cid in ch_map:
+                    new_chapters.append(ch_map[cid])
+            for ch in b.get("chapters", []):
+                if ch["id"] not in req.chapter_ids:
+                    new_chapters.append(ch)
+            b["chapters"] = new_chapters
+            b["updated_at"] = datetime.now().isoformat()[:19]
+            _save_json(BOOKS_FILE, books)
+            return {"ok": True, "chapter_count": len(new_chapters)}
+    raise HTTPException(status_code=404, detail="书籍不存在")
+
+
+# ============ 书库导出 API ============
+
+@app.get("/api/books/export")
+async def export_books(book_id: str = None, format: str = "txt"):
+    """导出书库内容，format: txt/json"""
+    books = _load_json(BOOKS_FILE, [])
+    if book_id:
+        books = [b for b in books if b["id"] == book_id]
+    if not books:
+        raise HTTPException(status_code=404, detail="未找到书籍")
+
+    if format == "json":
+        from fastapi.responses import Response
+        content = json.dumps(books, ensure_ascii=False, indent=2)
+        return Response(content=content, media_type="application/json",
+                       headers={"Content-Disposition": "attachment; filename=books_export.json"})
+    else:
+        lines = []
+        for b in books:
+            lines.append(f"《{b['title']}》 作者：{b.get('author', '未知')}")
+            lines.append("=" * 40)
+            for ch in b.get("chapters", []):
+                lines.append(f"\n{ch['title']}")
+                lines.append("-" * 30)
+                lines.append(ch.get("content", ""))
+            lines.append("\n" + "=" * 40 + "\n")
+        content = "\n".join(lines)
+        from fastapi.responses import Response
+        return Response(content=content, media_type="text/plain; charset=utf-8",
+                       headers={"Content-Disposition": "attachment; filename=books_export.txt"})
 
 
 # ---- 文件导入 ----
@@ -663,7 +857,7 @@ SEED_BOOKS = [
     {"title": '神墓', "author": '辰东', "chapters": [
         {"title": '第一章 神墓', "content": '万年前的大神独孤败天陨落了，他的墓地却成了后世修者心中的圣地。辰南从混沌中醒来，发现自己躺在一座巨大的古墓之中。周围是无数神魔的尸体，不朽的气息弥漫在空中。他摸了摸自己的身体——他还活着。一个苍老的声音在墓中回响：你终于醒了。'},
         {"title": '第二章 澹台圣地', "content": '辰南走出神墓，发现外面的世界已经沧海桑田。万年光阴流转，曾经的大陆早已面目全非。澹台圣地的圣女发现了这个从古墓中走出的青年，惊为天人。辰南望着天空：这个世界，比万年前更加疯狂了。魔主在暗处冷冷注视着他。'},
-        {"title": '第三章 澹台圣地', "content": '辰南走出神墓，发现外面的世界已经沧海桑田。万年光阴流转，曾经的大陆早已面目全非。澹台圣地的圣女发现了这个从古墓中走出的青年，惊为天人。辰南望着天空：这个世界，比万年前更加疯狂了。魔主在暗处冷冷注视着他。'},
+        {"title": '第三章 万年前', "content": '辰南从神墓的残留记忆中窥见了万年前的真相。那时候他是独孤败天的追随者，曾在太古战场上浴血厮杀。万年前的那场大战，诸天陨落，神魔喋血，连天道都被撕裂了。他只记得自己最后倒下时的画面——一个白衣女子挡在他面前，泪流满面。辰南：她是谁？记忆在那一刻断裂了。'},
         {"title": '第四章 雨馨', "content": '雨馨是辰南在万年前最放不下的人。他找到了她的转世，却发现她已不再记得前世的一切。辰南远远地看着她在花丛中嬉戏，没有上前打扰。梦可儿在旁边问：你认识她？辰南摇了摇头：不认识，只是觉得她的笑容很像一个人。'},
         {"title": '第五章 太古', "content": '辰南的修为恢复到了太古境，这个层次已经是凡人能触及的极限。他站在天穹之上俯瞰大地，众生如蝼蚁。但他并不觉得渺小——因为天之上还有天，道之上还有道。太古禁忌的身影在虚空中若隐若现：你终于走到了这一步。辰南握紧双拳：这才刚开始。'},
     ]},
@@ -821,7 +1015,7 @@ _seed_books()
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "5.0"}
+    return {"status": "ok", "version": "6.0"}
 
 
 # ============ 管理员认证 ============
