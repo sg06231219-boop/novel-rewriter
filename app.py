@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""小说翻改工具 v2.0"""
+"""小说翻改工具 v3.0 — 含书库功能"""
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
@@ -9,10 +9,31 @@ from typing import List, Dict, Optional
 import uvicorn
 import re
 import json
+import os
 import httpx
 from collections import Counter
+from datetime import datetime
 
-app = FastAPI(title="小说翻改工具 v2.0")
+app = FastAPI(title="小说翻改工具 v3.0")
+
+DATA_DIR = os.environ.get("DATA_DIR", "data")
+BOOKS_FILE = os.path.join(DATA_DIR, "books.json")
+RULES_FILE = os.path.join(DATA_DIR, "rules.json")
+
+# 确保数据目录存在
+os.makedirs(DATA_DIR, exist_ok=True)
+
+def _load_json(path: str, default):
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return default
+
+def _save_json(path: str, data):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# ============ 数据模型 ============
 
 class ReplaceRule(BaseModel):
     original: str
@@ -32,6 +53,21 @@ class RewriteResponse(BaseModel):
 
 class ExtractRequest(BaseModel):
     text: str
+
+class BookCreate(BaseModel):
+    title: str
+    author: str = ""
+    chapters: List[Dict] = []  # [{title, content}]
+
+class ChapterAdd(BaseModel):
+    title: str
+    content: str
+
+class RulesSave(BaseModel):
+    name: str
+    rules: List[ReplaceRule]
+
+# ============ 核心逻辑 ============
 
 def apply_rules(text: str, rules: List[ReplaceRule]) -> str:
     result = text
@@ -62,13 +98,11 @@ def ai_rewrite(text: str, api_key: str, intensity: str = "medium") -> str:
 {text}"""
     return call_zhipu(prompt, api_key)
 
-LOC_SUFFIXES = ("城", "山", "谷", "海", "岛", "湖", "河", "江", "峰", "崖",
-                "洞", "窟", "林", "原", "漠", "泽", "渊", "潭", "溪", "泉",
-                "州", "郡", "省", "镇", "村", "关", "渡", "桥", "亭")
-
-ORG_SUFFIXES = ("门", "派", "宗", "阁", "楼", "庄", "堡", "寨", "宫", "殿",
-                "堂", "院", "帮", "盟", "教", "寺", "观")
-
+LOC_SUFFIXES = ("城","山","谷","海","岛","湖","河","江","峰","崖",
+                "洞","窟","林","原","漠","泽","渊","潭","溪","泉",
+                "州","郡","省","镇","村","关","渡","桥","亭")
+ORG_SUFFIXES = ("门","派","宗","阁","楼","庄","堡","寨","宫","殿",
+                "堂","院","帮","盟","教","寺","观")
 SURNAMES = set(
     "赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华"
     "金魏陶姜戚谢邹喻柏水窦章云苏潘葛奚范彭郎鲁韦昌马苗凤花方俞"
@@ -78,12 +112,10 @@ SURNAMES = set(
     "支柯管卢莫经房干解应宗丁邓郁单洪包诸左石崔龚程裴陆荣曲家封储靳段"
     "富巫乌焦巴弓牧山谷车侯班仰秋仲伊宫宁仇栾暴甘厉戎祖武符刘景詹束龙"
     "叶幸司黎薄印宿白怀蒲邰从鄂索咸籍赖卓屠蒙池乔曾沙养鞠须丰巢关相查"
-    "后荆红游权盖益桓公"
-    "药古魔邪赤青白紫玄天幽冥血影灵仙剑圣尊帝皇王"  # 常见称呼前缀
+    "后荆红游权盖益桓公药古魔邪赤青白紫玄天幽冥血影灵仙剑圣尊帝皇王"
 )
 
 def extract_names_rule_based(text: str) -> Dict[str, List[str]]:
-    # 人名候选
     candidates = Counter()
     for i, ch in enumerate(text):
         if ch in SURNAMES:
@@ -113,7 +145,6 @@ def extract_names_rule_based(text: str) -> Dict[str, List[str]]:
         if any(c in name for c in '，。！？、；：''""（）【】《》'): continue
         filtered[name] = count
 
-    # 去除长名（短名前缀频率 >= 长名频率）
     to_remove = set()
     for long_name in filtered:
         for short_name in filtered:
@@ -122,7 +153,6 @@ def extract_names_rule_based(text: str) -> Dict[str, List[str]]:
                 to_remove.add(long_name)
     for n in to_remove: del filtered[n]
 
-    # 2字名如果是地名/组织名前缀，重分类
     loc_org_set = set()
     for suffixes, mx in [(LOC_SUFFIXES, 3), (ORG_SUFFIXES, 2)]:
         pat = re.compile(r'([\u4e00-\u9fff]{1,' + str(mx) + r'}(?:' + '|'.join(suffixes) + r'))')
@@ -137,7 +167,6 @@ def extract_names_rule_based(text: str) -> Dict[str, List[str]]:
 
     persons = [n for n, _ in Counter(filtered).most_common()][:30]
 
-    # 地名
     loc_pat = re.compile(r'([\u4e00-\u9fff]{1,3}(?:' + '|'.join(LOC_SUFFIXES) + r'))')
     locs = set(loc_pat.findall(text))
     bad_locs = {"大山","小山","高山","深山","出山","山河","江山","大海","深海",
@@ -146,7 +175,6 @@ def extract_names_rule_based(text: str) -> Dict[str, List[str]]:
                 "出关","过关","关山"}
     locations = sorted(l for l in locs if l not in bad_locs)[:20]
 
-    # 组织名
     org_pat = re.compile(r'([\u4e00-\u9fff]{1,2}(?:' + '|'.join(ORG_SUFFIXES) + r'))')
     orgs = set(org_pat.findall(text))
     bad_orgs = {"出门","开门","关门","敲门","进门","热门","冷门","正派","反派",
@@ -156,6 +184,8 @@ def extract_names_rule_based(text: str) -> Dict[str, List[str]]:
     organizations = sorted(o for o in orgs if o not in bad_orgs and not o.startswith("的"))[:20]
 
     return {"person": persons, "location": locations, "organization": organizations, "item": [], "other": []}
+
+# ============ API路由 ============
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
@@ -187,9 +217,131 @@ async def extract_names(req: ExtractRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ============ 书库 API ============
+
+@app.get("/api/books")
+async def list_books():
+    books = _load_json(BOOKS_FILE, [])
+    # 只返回摘要，不返回章节内容
+    result = []
+    for b in books:
+        result.append({
+            "id": b["id"],
+            "title": b["title"],
+            "author": b.get("author", ""),
+            "chapter_count": len(b.get("chapters", [])),
+            "created_at": b.get("created_at", ""),
+            "updated_at": b.get("updated_at", ""),
+        })
+    return {"books": result}
+
+@app.post("/api/books")
+async def create_book(req: BookCreate):
+    books = _load_json(BOOKS_FILE, [])
+    book_id = f"b_{int(datetime.now().timestamp()*1000)}"
+    now = datetime.now().isoformat()[:19]
+    book = {
+        "id": book_id,
+        "title": req.title,
+        "author": req.author,
+        "chapters": req.chapters,
+        "created_at": now,
+        "updated_at": now,
+    }
+    books.append(book)
+    _save_json(BOOKS_FILE, books)
+    return {"id": book_id, "title": req.title}
+
+@app.get("/api/books/{book_id}")
+async def get_book(book_id: str):
+    books = _load_json(BOOKS_FILE, [])
+    for b in books:
+        if b["id"] == book_id:
+            return b
+    raise HTTPException(status_code=404, detail="书籍不存在")
+
+@app.delete("/api/books/{book_id}")
+async def delete_book(book_id: str):
+    books = _load_json(BOOKS_FILE, [])
+    books = [b for b in books if b["id"] != book_id]
+    _save_json(BOOKS_FILE, books)
+    return {"ok": True}
+
+@app.post("/api/books/{book_id}/chapters")
+async def add_chapter(book_id: str, req: ChapterAdd):
+    books = _load_json(BOOKS_FILE, [])
+    for b in books:
+        if b["id"] == book_id:
+            ch_id = f"ch_{len(b.get('chapters', [])) + 1}"
+            b.setdefault("chapters", []).append({
+                "id": ch_id,
+                "title": req.title,
+                "content": req.content,
+            })
+            b["updated_at"] = datetime.now().isoformat()[:19]
+            _save_json(BOOKS_FILE, books)
+            return {"id": ch_id}
+    raise HTTPException(status_code=404, detail="书籍不存在")
+
+@app.put("/api/books/{book_id}/chapters/{ch_id}")
+async def update_chapter(book_id: str, ch_id: str, req: ChapterAdd):
+    books = _load_json(BOOKS_FILE, [])
+    for b in books:
+        if b["id"] == book_id:
+            for ch in b.get("chapters", []):
+                if ch["id"] == ch_id:
+                    ch["title"] = req.title
+                    ch["content"] = req.content
+                    b["updated_at"] = datetime.now().isoformat()[:19]
+                    _save_json(BOOKS_FILE, books)
+                    return {"ok": True}
+    raise HTTPException(status_code=404, detail="章节不存在")
+
+@app.delete("/api/books/{book_id}/chapters/{ch_id}")
+async def delete_chapter(book_id: str, ch_id: str):
+    books = _load_json(BOOKS_FILE, [])
+    for b in books:
+        if b["id"] == book_id:
+            b["chapters"] = [ch for ch in b.get("chapters", []) if ch["id"] != ch_id]
+            b["updated_at"] = datetime.now().isoformat()[:19]
+            _save_json(BOOKS_FILE, books)
+            return {"ok": True}
+    raise HTTPException(status_code=404, detail="书籍不存在")
+
+# ============ 规则模板 API ============
+
+@app.get("/api/rules")
+async def list_rules():
+    rules = _load_json(RULES_FILE, [])
+    return {"rules": rules}
+
+@app.post("/api/rules")
+async def save_rules(req: RulesSave):
+    rules = _load_json(RULES_FILE, [])
+    rule_id = f"r_{int(datetime.now().timestamp()*1000)}"
+    now = datetime.now().isoformat()[:19]
+    entry = {
+        "id": rule_id,
+        "name": req.name,
+        "rules": [{"original": r.original, "replacement": r.replacement} for r in req.rules],
+        "created_at": now,
+    }
+    rules.append(entry)
+    _save_json(RULES_FILE, rules)
+    return {"id": rule_id}
+
+@app.delete("/api/rules/{rule_id}")
+async def delete_rules(rule_id: str):
+    rules = _load_json(RULES_FILE, [])
+    rules = [r for r in rules if r["id"] != rule_id]
+    _save_json(RULES_FILE, rules)
+    return {"ok": True}
+
+# ============ 健康检查 ============
+
 @app.get("/api/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": "3.0"}
 
 if __name__ == "__main__":
     import os
