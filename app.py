@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""小说翻改工具 v4.1 — 全方位优化版
+"""小说翻改工具 v5.0 — 全方位优化版
 新功能：多AI后端、物品名提取、CORS、文件导入、规则清空、
       字体调节、主题切换、本地暂存、差异高亮修复、
       AI改写后再做名称替换、移动端适配、管理员后台、
-      31本书每本5章扩充
-"""
+      31本书每本5章扩充、整本书一键翻改、
+      同步滚动、复制按钮、进度条"""
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
@@ -21,7 +21,7 @@ from collections import Counter
 from datetime import datetime
 # chardet removed - not needed
 
-app = FastAPI(title="小说翻改工具 v4.1")
+app = FastAPI(title="小说翻改工具 v5.0")
 
 ADMIN_PWD = os.environ.get("ADMIN_PASSWORD", "admin123")
 
@@ -492,6 +492,80 @@ async def delete_rules(rule_id: str):
     return {"ok": True}
 
 
+# ============ 整本书翻改 API ============
+
+class BookRewriteRequest(BaseModel):
+    rules: List[ReplaceRule]
+    use_ai: bool = False
+    ai_intensity: str = "medium"
+    api_key: Optional[str] = None
+    ai_provider: str = "zhipu"
+    chapter_ids: Optional[List[str]] = None  # 指定章节ID，空=全部
+
+
+@app.post("/api/books/{book_id}/rewrite")
+async def rewrite_book(book_id: str, req: BookRewriteRequest):
+    """整本书翻改，返回每个章节的翻改结果"""
+    books = _load_json(BOOKS_FILE, [])
+    book = None
+    for b in books:
+        if b["id"] == book_id:
+            book = b
+            break
+    if not book:
+        raise HTTPException(status_code=404, detail="书籍不存在")
+
+    chapters = book.get("chapters", [])
+    if req.chapter_ids:
+        chapters = [ch for ch in chapters if ch["id"] in req.chapter_ids]
+
+    if not chapters:
+        raise HTTPException(status_code=400, detail="没有可翻改的章节")
+
+    results = []
+    for ch in chapters:
+        text = ch.get("content", "")
+        rewritten = text
+        rep_details = []
+
+        # AI改写
+        if req.use_ai and req.api_key:
+            try:
+                rewritten = ai_rewrite(
+                    rewritten, req.api_key,
+                    req.ai_intensity, req.ai_provider
+                )
+            except Exception as e:
+                rep_details.append({
+                    "original": "⚠️",
+                    "replacement": f"AI改写失败: {e}",
+                    "count": 0
+                })
+
+        # 名称替换
+        rewritten, rule_reps = apply_rules(rewritten, req.rules)
+        rep_details.extend(rule_reps)
+
+        total = sum(r["count"] for r in rep_details if r["original"] != "⚠️")
+
+        results.append({
+            "id": ch["id"],
+            "title": ch["title"],
+            "original": text,
+            "rewritten": rewritten,
+            "replacements": rep_details,
+            "replace_count": total,
+        })
+
+    return {
+        "book_id": book_id,
+        "book_title": book["title"],
+        "total_chapters": len(results),
+        "total_replacements": sum(r["replace_count"] for r in results),
+        "chapters": results,
+    }
+
+
 # ============ 初始数据 ============
 
 SEED_BOOKS = [
@@ -747,7 +821,7 @@ _seed_books()
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "4.1"}
+    return {"status": "ok", "version": "5.0"}
 
 
 # ============ 管理员认证 ============
