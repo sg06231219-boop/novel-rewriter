@@ -81,7 +81,7 @@ tr:hover td{background:var(--sf2)}
 <div class="login-wrap" id="loginWrap">
   <div class="login-box">
     <h1>📖 管理后台</h1>
-    <p>小说翻改工具 v4.1</p>
+    <p>小说翻改工具 v5.0</p>
     <input type="password" id="pwdInput" placeholder="管理员密码" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="btn btn-p" onclick="doLogin()">登录</button>
   </div>
@@ -138,6 +138,20 @@ tr:hover td{background:var(--sf2)}
 
 <div class="ld" id="ldBg"><div class="spin"></div></div>
 <div class="toast" id="toast"></div>
+
+<!-- 通用编辑模态框 -->
+<div style="position:fixed;inset:0;background:rgba(10,10,20,.85);display:none;align-items:center;justify-content:center;z-index:999" id="editModal">
+  <div style="background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:16px;width:440px;max-width:92vw;max-height:90vh;overflow-y:auto">
+    <h2 style="font-size:1em;margin-bottom:10px" id="editModalTitle">编辑</h2>
+    <input type="text" id="editField1" placeholder="" style="width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px;color:var(--tx);font-size:13px;margin-bottom:8px">
+    <input type="text" id="editField2" placeholder="" style="width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px;color:var(--tx);font-size:13px;margin-bottom:8px;display:none">
+    <textarea id="editArea" placeholder="" style="width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px;color:var(--tx);font-size:13px;height:160px;resize:vertical;font-family:inherit;display:none"></textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+      <button class="btn btn-g" onclick="closeEditModal()">取消</button>
+      <button class="btn btn-p" id="editModalOk">确定</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const API = '';
@@ -290,31 +304,81 @@ async function reseedData() {
   finally { hideLd(); }
 }
 
+// ====== 编辑模态框 ======
+let editModalCallback = null;
+function openEditModal(title, fields, callback) {
+  /* fields: [{id,label,value,type}] */
+  document.getElementById('editModalTitle').textContent = title;
+  const f1 = document.getElementById('editField1');
+  const f2 = document.getElementById('editField2');
+  const ta = document.getElementById('editArea');
+  f1.style.display = 'none'; f2.style.display = 'none'; ta.style.display = 'none';
+  fields.forEach((f, i) => {
+    if (f.type === 'textarea') {
+      ta.placeholder = f.label || ''; ta.value = f.value || ''; ta.style.display = 'block';
+    } else {
+      const el = i === 0 ? f1 : f2;
+      el.placeholder = f.label || ''; el.value = f.value || ''; el.style.display = 'block';
+    }
+  });
+  editModalCallback = callback;
+  document.getElementById('editModal').style.display = 'flex';
+  // auto focus
+  const first = fields[0]?.type === 'textarea' ? ta : f1;
+  setTimeout(() => first.focus(), 100);
+}
+function closeEditModal() {
+  document.getElementById('editModal').style.display = 'none';
+  editModalCallback = null;
+}
+document.getElementById('editModalOk').onclick = function() {
+  if (!editModalCallback) return;
+  const f1 = document.getElementById('editField1').value;
+  const f2 = document.getElementById('editField2').value;
+  const ta = document.getElementById('editArea').value;
+  // Collect all values
+  const vals = [];
+  const modal = document.getElementById('editModal');
+  // Figure out which fields were shown
+  if (document.getElementById('editField1').style.display !== 'none') vals.push(f1);
+  if (document.getElementById('editField2').style.display !== 'none') vals.push(f2);
+  if (document.getElementById('editArea').style.display !== 'none') vals.push(ta);
+  editModalCallback(vals);
+  closeEditModal();
+};
+
 function showAddBook() {
-  const title = prompt('书名：');
-  if (!title) return;
-  const author = prompt('作者（选填）：') || '';
-  fetch(`${API}/api/books`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({title, author, chapters:[]})
-  }).then(() => { toast('已创建','ok'); refreshData(); });
+  openEditModal('📚 新建书籍', [
+    {label: '书名', value: ''},
+    {label: '作者（选填）', value: ''}
+  ], function(vals) {
+    const [title, author] = vals;
+    if (!title) { toast('请输入书名','err'); return; }
+    fetch(`${API}/api/books`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({title, author: author||'', chapters:[]})
+    }).then(() => { toast('已创建','ok'); refreshData(); });
+  });
 }
 
 function showAddChapter() {
-  // 先列出所有书供选择
-  let msg = '输入书序号：\n';
-  allBooks.forEach((b,i) => msg += `${i+1}. ${b.title}\n`);
-  const idx = parseInt(prompt(msg));
-  if (isNaN(idx) || idx < 1 || idx > allBooks.length) return;
-  const bookId = allBooks[idx-1].id;
-  const title = prompt('章节标题：');
-  if (!title) return;
-  const content = prompt('章节内容：');
-  if (!content) return;
-  fetch(`${API}/api/books/${bookId}/chapters`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({title, content})
-  }).then(() => { toast('已添加','ok'); refreshData(); });
+  // 构建书籍选择下拉
+  const options = allBooks.map((b,i) => `${i+1}. ${b.title}`).join('\n');
+  openEditModal('📝 添加章节', [
+    {label: `书序号 (1-${allBooks.length}):\n${options}`, value: ''},
+    {label: '章节标题', value: ''},
+    {label: '章节内容', value: '', type: 'textarea'}
+  ], function(vals) {
+    const [idxStr, title, content] = vals;
+    const idx = parseInt(idxStr);
+    if (isNaN(idx) || idx < 1 || idx > allBooks.length) { toast('序号无效','err'); return; }
+    const bookId = allBooks[idx-1].id;
+    if (!content) { toast('请输入内容','err'); return; }
+    fetch(`${API}/api/books/${bookId}/chapters`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({title: title||'新章节', content})
+    }).then(() => { toast('已添加','ok'); refreshData(); });
+  });
 }
 
 async function editChapter(bookId, chId) {
@@ -323,21 +387,23 @@ async function editChapter(bookId, chId) {
     const book = await r.json();
     const ch = (book.chapters||[]).find(c => c.id === chId);
     if (!ch) return;
-    const newTitle = prompt('章节标题：', ch.title);
-    if (!newTitle) return;
-    const newContent = prompt('章节内容：', ch.content);
-    if (newContent === null) return;
-    await fetch(`${API}/api/books/${bookId}/chapters/${chId}`, {
-      method:'PUT', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({title: newTitle, content: newContent})
+    openEditModal('✏️ 编辑章节', [
+      {label: '章节标题', value: ch.title},
+      {label: '章节内容', value: ch.content, type: 'textarea'}
+    ], async function(vals) {
+      const [newTitle, newContent] = vals;
+      if (newContent === null) return;
+      await fetch(`${API}/api/books/${bookId}/chapters/${chId}`, {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({title: newTitle, content: newContent})
+      });
+      toast('已更新','ok');
+      const el = document.getElementById(`chcontent_${bookId}`);
+      if (el) el.textContent = '加载中...';
+      toggleBookDetail(bookId);
+      toggleBookDetail(bookId);
+      toggleBookDetail(bookId);
     });
-    toast('已更新','ok');
-    // 清除缓存重新加载
-    const el = document.getElementById(`chcontent_${bookId}`);
-    if (el) el.textContent = '加载中...';
-    toggleBookDetail(bookId);
-    toggleBookDetail(bookId);
-    toggleBookDetail(bookId);
   } catch(e) { toast('编辑失败','err'); }
 }
 
