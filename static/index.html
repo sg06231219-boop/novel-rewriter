@@ -64,13 +64,13 @@ body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;background:var(--bg)
 .bk:hover .bx{opacity:1}
 .bk .bx:hover{color:var(--dg)}
 
-.ch{padding:4px 8px 4px 24px;border-radius:3px;cursor:pointer;font-size:10px;color:var(--tx2);transition:all .12s;margin-bottom:1px;display:flex;align-items:center;justify-content:space-between}
+.ch{padding:4px 8px 4px 32px;border-radius:3px;cursor:pointer;font-size:10px;color:var(--tx2);transition:all .12s;margin-bottom:1px;display:flex;align-items:center;justify-content:space-between}
 .ch:hover{background:var(--sf3);color:var(--tx)}
 .ch.on{color:var(--pm);background:var(--pmbg)}
 .ch .ch-t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ch .ch-x{opacity:0;color:var(--dg);font-size:12px;margin-left:4px}
 .ch:hover .ch-x{opacity:1}
-.ch-add{padding:4px 8px 4px 24px;border-radius:3px;cursor:pointer;font-size:10px;color:var(--pm);text-align:center}
+.ch-add{padding:4px 8px 4px 32px;border-radius:3px;cursor:pointer;font-size:10px;color:var(--pm);text-align:center}
 
 /* 中栏 规则 */
 .panel-m{width:260px;background:var(--sf);border-right:1px solid var(--bd);display:flex;flex-direction:column;flex-shrink:0}
@@ -399,58 +399,79 @@ async function loadBooks() {
     const r = await fetch(`${API}/api/books`);
     const d = await r.json();
     allBooks = d.books || [];
-    renderBooks();
+    renderBookList();
   } catch(e) { console.error(e); }
 }
 
-function renderBooks() {
+function renderBookList() {
   const el = document.getElementById('bookList');
   const q = (document.getElementById('bookSearch')?.value || '').toLowerCase();
   const filtered = q ? allBooks.filter(b => b.title.toLowerCase().includes(q) || (b.author||'').toLowerCase().includes(q)) : allBooks;
   if (!filtered.length) { el.innerHTML = '<div class="empty"><span class="e">📚</span>暂无书籍</div>'; return; }
+  
+  // 先加载已展开书的详情再渲染
+  const expandedId = curBook;
+  const expandedData = currentBookData;
+  
   let html = '';
   filtered.forEach(b => {
+    const isExpanded = b.id === expandedId && expandedData;
     const on = b.id === curBook ? ' on' : '';
+    const arrow = isExpanded ? '▼' : '▶';
     html += `<div class="bk${on}" onclick="selectBook('${b.id}')">
+      <span class="bi" style="font-size:8px">${arrow}</span>
       <span class="bi">📖</span>
       <div style="flex:1;min-width:0"><div class="bn">${esc(b.title)}</div><div class="bm">${b.author?esc(b.author)+' · ':''}${b.chapter_count}章</div></div>
       <span class="bx" onclick="event.stopPropagation();confirmDelete('book','${b.id}','「${esc(b.title)}」')">×</span>
     </div>`;
+    // 展开的书的章节直接渲染在书下面
+    if (isExpanded) {
+      const chs = expandedData.chapters || [];
+      chs.forEach(ch => {
+        const chOn = ch.id === curCh ? ' on' : '';
+        html += `<div class="ch${chOn}" onclick="loadChapterById('${b.id}','${ch.id}')">
+          <span class="ch-t">${esc(ch.title)}</span>
+          <span class="ch-x" onclick="event.stopPropagation();confirmDelete('chapter','${ch.id}','「${esc(ch.title)}」')">×</span>
+        </div>`;
+      });
+      html += `<div class="ch-add" onclick="event.stopPropagation();showModal('addChModal')">+ 添加章节</div>`;
+    }
   });
   el.innerHTML = html;
-  if (curBook && currentBookData) renderChapters(currentBookData);
 }
 
-function filterBooks() { renderBooks(); }
+function filterBooks() { renderBookList(); }
 
 async function selectBook(id) {
-  if (curBook === id) { curBook = null; curCh = null; currentBookData = null; renderBooks(); return; }
+  if (curBook === id) { 
+    // 再次点击折叠
+    curBook = null; curCh = null; currentBookData = null; 
+    renderBookList(); 
+    return; 
+  }
   curBook = id; curCh = null;
   try {
     const r = await fetch(`${API}/api/books/${id}`);
     currentBookData = await r.json();
-    renderBooks();
+    renderBookList();
   } catch(e) { toast('加载失败','err'); }
 }
 
-function renderChapters(book) {
-  const el = document.getElementById('bookList');
-  el.querySelectorAll('.ch,.ch-add').forEach(e => e.remove());
-  const chs = book.chapters || [];
-  chs.forEach(ch => {
-    const d = document.createElement('div');
-    d.className = 'ch' + (ch.id === curCh ? ' on' : '');
-    d.innerHTML = `<span class="ch-t">${esc(ch.title)}</span><span class="ch-x" onclick="event.stopPropagation();confirmDelete('chapter','${ch.id}','「${esc(ch.title)}」')">×</span>`;
-    d.onclick = (ev) => { ev.stopPropagation(); loadChapter(ch, d); };
-    el.appendChild(d);
-  });
-  const addD = document.createElement('div');
-  addD.className = 'ch-add';
-  addD.textContent = '+ 添加章节';
-  addD.onclick = (ev) => { ev.stopPropagation(); showModal('addChModal'); };
-  el.appendChild(addD);
+// 通过bookId+chId加载章节（从currentBookData查找）
+function loadChapterById(bookId, chId) {
+  if (!currentBookData || currentBookData.id !== bookId) return;
+  const ch = (currentBookData.chapters || []).find(c => c.id === chId);
+  if (!ch) return;
+  curCh = chId;
+  document.getElementById('origText').value = ch.content;
+  updateCnt(); saveDraft();
+  // 更新高亮
+  document.querySelectorAll('.ch').forEach(e => e.classList.remove('on'));
+  event.currentTarget?.classList.add('on');
+  toast(`已加载「${ch.title}」`,'ok');
 }
 
+// 保留兼容
 function loadChapter(ch, el) {
   curCh = ch.id;
   document.getElementById('origText').value = ch.content;
@@ -490,7 +511,13 @@ async function addChapter() {
     document.getElementById('newChTitle').value='';
     document.getElementById('newChContent').value='';
     toast(`「${title}」已添加`,'ok');
-    await selectBook(curBook);
+    // 重新加载书详情+书列表
+    const r = await fetch(`${API}/api/books/${curBook}`);
+    currentBookData = await r.json();
+    await loadBooks();
+    // 保持展开状态
+    curBook = currentBookData.id;
+    renderBookList();
   } catch(e) { toast('添加失败','err'); }
 }
 
@@ -516,7 +543,16 @@ async function executeDelete() {
       await fetch(`${API}/api/books/${curBook}/chapters/${id}`, {method:'DELETE'});
       if (curCh === id) curCh = null;
       toast('已删除','ok');
-      await selectBook(curBook);
+      // 重新加载书详情
+      const r = await fetch(`${API}/api/books/${curBook}`);
+      currentBookData = await r.json();
+      await loadBooks();
+      curBook = currentBookData.id;
+      renderBookList();
+    } else if (type === 'template') {
+      await fetch(`${API}/api/rules/${id}`, {method:'DELETE'});
+      toast('已删除','ok');
+      await loadTemplates();
     }
   } catch(e) { toast('删除失败','err'); }
   deleteTarget = null;
