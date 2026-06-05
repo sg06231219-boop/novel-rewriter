@@ -124,6 +124,12 @@ textarea.ed:focus{outline:none}
 .result{font-size:13px;line-height:1.9;white-space:pre-wrap;word-break:break-all;transition:font-size .2s}
 .diff-new{background:rgba(78,205,196,.2);color:var(--ok);border-radius:2px;padding:0 1px}
 
+.copy-btn{position:absolute;top:6px;right:6px;padding:3px 8px;background:var(--sf3);border:1px solid var(--bd);border-radius:4px;color:var(--tx2);font-size:9px;cursor:pointer;opacity:0;transition:opacity .2s}
+.cmp-h:hover .copy-btn{opacity:1}
+.copy-btn:hover{background:var(--pm);color:#fff;border-color:var(--pm)}
+
+.sync-scroll{position:relative}
+
 .sbar{background:var(--sf);border-top:1px solid var(--bd);padding:3px 10px;font-size:10px;color:var(--tx3);display:flex;gap:10px;flex-shrink:0}
 .sbar .v{color:var(--pm);font-weight:bold}
 
@@ -188,7 +194,7 @@ textarea.ed:focus{outline:none}
 <div class="app">
   <div class="topbar">
     <button class="btn btn-g btn-xs" onclick="togglePanel('panelL')" title="书库">📚</button>
-    <h1>📖 小说翻改</h1><span class="ver">v4.0</span>
+    <h1>📖 小说翻改</h1><span class="ver" id="verBadge">v4.1</span>
     <div class="topbar-right">
       <button class="btn btn-g btn-xs" onclick="toggleTheme()" id="themeBtn" title="主题">🌙</button>
       <button class="btn btn-g btn-xs" onclick="showModal('apiModal')" title="API设置">🔑</button>
@@ -238,6 +244,14 @@ textarea.ed:focus{outline:none}
       </div>
       <div style="padding:6px;border-top:1px solid var(--bd)">
         <button class="btn btn-p" onclick="doRewrite()" id="rewriteBtn" style="width:100%;padding:8px;font-size:12px">🚀 开始翻改</button>
+        <button class="btn btn-a" onclick="rewriteBook()" id="rewriteBookBtn" style="width:100%;padding:8px;font-size:12px;margin-top:3px">📚 整本翻改</button>
+        <div id="bookRewriteProgress" style="display:none;margin-top:4px">
+          <div style="background:var(--sf2);border-radius:4px;overflow:hidden;height:16px;position:relative">
+            <div id="brProgress" style="background:linear-gradient(90deg,var(--pm),var(--ac));height:100%;width:0;transition:width .3s"></div>
+            <span id="brProgressText" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff">0%</span>
+          </div>
+          <div id="brStatus" style="font-size:9px;color:var(--tx3);text-align:center;margin-top:2px"></div>
+        </div>
       </div>
     </div>
 
@@ -256,14 +270,14 @@ textarea.ed:focus{outline:none}
         </div>
         <div class="counter">原文 <span id="cntO">0</span> 字 → 改写 <span id="cntR">0</span> 字</div>
       </div>
-      <div class="cmp">
+      <div class="cmp" id="cmpContainer">
         <div class="cmp-p">
-          <div class="cmp-h"><div class="dot" style="background:var(--wn)"></div>原文</div>
-          <div class="cmp-b"><textarea class="ed" id="origText" placeholder="粘贴原文或从书库加载..." oninput="updateCnt();saveDraft()"></textarea></div>
+          <div class="cmp-h"><div class="dot" style="background:var(--wn)"></div>原文 <button class="copy-btn" onclick="copyText('origText')">📋 复制</button></div>
+          <div class="cmp-b" id="origScroll"><textarea class="ed" id="origText" placeholder="粘贴原文或从书库加载..." oninput="updateCnt();saveDraft()"></textarea></div>
         </div>
         <div class="cmp-p">
-          <div class="cmp-h"><div class="dot" style="background:var(--ok)"></div>结果 <span id="repInfo" style="margin-left:auto;font-size:9px"></span></div>
-          <div class="cmp-b"><div class="result" id="resultText">等待翻改...</div></div>
+          <div class="cmp-h"><div class="dot" style="background:var(--ok)"></div>结果 <span id="repInfo" style="margin-left:auto;font-size:9px"></span> <button class="copy-btn" onclick="copyResult()">📋 复制</button></div>
+          <div class="cmp-b" id="resultScroll"><div class="result" id="resultText">等待翻改...</div></div>
         </div>
       </div>
       <div class="sbar">
@@ -342,6 +356,8 @@ let allBooks = [];
 let lastRewriteData = null;
 let fontSize = 13;
 let extractedNames = {}; // 记录已添加的提取名称
+let syncScrollEnabled = true; // 同步滚动
+let bookRewriteResult = null; // 整本翻改结果
 
 // ====== 初始化 ======
 async function init() {
@@ -352,8 +368,9 @@ async function init() {
   loadFontSize();
   loadDraft();
   updateCnt();
-  // 加载各平台API Key
   loadApiKey();
+  setupSyncScroll();
+  fetchVersion();
 }
 
 // ====== 主题 ======
@@ -804,9 +821,18 @@ function handleFile(event) {
 function downloadResult() {
   const t = document.getElementById('resultText').textContent;
   if (!t || t==='等待翻改...') { toast('没有可下载的内容','wn'); return; }
+  let content = t;
+  // 如果是整本翻改结果，格式化输出
+  if (bookRewriteResult && bookRewriteResult.chapters && bookRewriteResult.chapters.length > 1) {
+    content = `《${bookRewriteResult.book_title}》翻改结果\n${'='.repeat(40)}\n\n`;
+    bookRewriteResult.chapters.forEach(ch => {
+      content += `${ch.title}\n${'-'.repeat(30)}\n${ch.rewritten}\n\n`;
+    });
+  }
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([t],{type:'text/plain;charset=utf-8'}));
-  a.download = `翻改结果_${new Date().toISOString().slice(0,10)}.txt`;
+  a.href = URL.createObjectURL(new Blob([content],{type:'text/plain;charset=utf-8'}));
+  const bookName = bookRewriteResult ? `_${bookRewriteResult.book_title}` : '';
+  a.download = `${bookName}翻改结果_${new Date().toISOString().slice(0,10)}.txt`;
   a.click();
   toast('已下载','ok');
 }
@@ -826,6 +852,161 @@ function showLd(t) { document.getElementById('ldText').textContent=t; document.g
 function hideLd() { document.getElementById('ldBg').classList.remove('show'); }
 function toast(msg,type='ok') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast toast-${type} show`; setTimeout(()=>t.classList.remove('show'),2500); }
 function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// ====== 版本号 ======
+async function fetchVersion() {
+  try {
+    const r = await fetch(`${API}/api/health`);
+    const d = await r.json();
+    document.getElementById('verBadge').textContent = d.version || '';
+  } catch(e) {}
+}
+
+// ====== 复制功能 ======
+function copyText(id) {
+  const el = document.getElementById(id);
+  const text = el.value || el.textContent;
+  navigator.clipboard.writeText(text).then(() => toast('已复制','ok')).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('已复制','ok');
+  });
+}
+function copyResult() {
+  const text = document.getElementById('resultText').textContent;
+  if (!text || text === '等待翻改...') { toast('没有可复制的内容','wn'); return; }
+  navigator.clipboard.writeText(text).then(() => toast('已复制','ok')).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('已复制','ok');
+  });
+}
+
+// ====== 同步滚动 ======
+function setupSyncScroll() {
+  const origS = document.getElementById('origScroll');
+  const resultS = document.getElementById('resultScroll');
+  if (!origS || !resultS) return;
+  let syncing = false;
+  origS.addEventListener('scroll', () => {
+    if (syncing || !syncScrollEnabled) return;
+    syncing = true;
+    const ratio = origS.scrollTop / (origS.scrollHeight - origS.clientHeight || 1);
+    resultS.scrollTop = ratio * (resultS.scrollHeight - resultS.clientHeight);
+    requestAnimationFrame(() => syncing = false);
+  });
+  resultS.addEventListener('scroll', () => {
+    if (syncing || !syncScrollEnabled) return;
+    syncing = true;
+    const ratio = resultS.scrollTop / (resultS.scrollHeight - resultS.clientHeight || 1);
+    origS.scrollTop = ratio * (origS.scrollHeight - origS.clientHeight);
+    requestAnimationFrame(() => syncing = false);
+  });
+}
+
+// ====== 整本翻改 ======
+async function rewriteBook() {
+  if (!curBook || !currentBookData) {
+    toast('请先选择一本书','wn'); return;
+  }
+  const rules = getRules();
+  if (!rules.length) { toast('请添加替换规则','wn'); return; }
+  const useAi = document.getElementById('useAi').checked;
+  const intensity = document.getElementById('aiLv').value;
+  const provider = document.getElementById('aiProvider').value;
+  const apiKey = useAi ? (localStorage.getItem('nr_apikey_' + provider) || '') : '';
+  if (useAi && !apiKey) { showModal('apiModal'); return; }
+
+  const totalCh = (currentBookData.chapters || []).length;
+  const doAi = useAi && apiKey;
+  const msg = doAi
+    ? `将对「${currentBookData.title}」全部 ${totalCh} 章进行AI+规则翻改，可能需要 ${totalCh}×30秒，确认？`
+    : `将对「${currentBookData.title}」全部 ${totalCh} 章进行规则翻改，确认？`;
+  if (!confirm(msg)) return;
+
+  const btn = document.getElementById('rewriteBookBtn');
+  btn.disabled = true;
+  const progEl = document.getElementById('bookRewriteProgress');
+  progEl.style.display = 'block';
+
+  if (!doAi) {
+    // 纯规则翻改，一次API调用
+    showLd('整本翻改中...');
+    try {
+      const r = await fetch(`${API}/api/books/${curBook}/rewrite`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ rules, use_ai: false, api_key: null, ai_provider: provider })
+      });
+      if (!r.ok) { const e = await r.json(); throw new Error(e.detail || '翻改失败'); }
+      bookRewriteResult = await r.json();
+      showBookRewriteResult(bookRewriteResult);
+      toast(`整本翻改完成！${bookRewriteResult.total_replacements}处替换`,'ok');
+    } catch(e) { toast('翻改失败: '+e.message,'err'); }
+    finally { btn.disabled = false; progEl.style.display = 'none'; hideLd(); }
+  } else {
+    // AI翻改，逐章调用（避免超时）
+    bookRewriteResult = { book_id: curBook, book_title: currentBookData.title, total_chapters: 0, total_replacements: 0, chapters: [] };
+    let totalReps = 0;
+    const chapters = currentBookData.chapters || [];
+    for (let i = 0; i < chapters.length; i++) {
+      const ch = chapters[i];
+      const pct = Math.round(((i + 1) / chapters.length) * 100);
+      document.getElementById('brProgress').style.width = pct + '%';
+      document.getElementById('brProgressText').textContent = pct + '%';
+      document.getElementById('brStatus').textContent = `正在翻改: ${ch.title} (${i+1}/${chapters.length})`;
+      try {
+        const r = await fetch(`${API}/api/books/${curBook}/rewrite`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ rules, use_ai: true, ai_intensity: intensity, api_key: apiKey, ai_provider: provider, chapter_ids: [ch.id] })
+        });
+        if (!r.ok) continue;
+        const d = await r.json();
+        if (d.chapters && d.chapters[0]) {
+          bookRewriteResult.chapters.push(d.chapters[0]);
+          totalReps += d.chapters[0].replace_count;
+        }
+      } catch(e) { /* skip failed chapter */ }
+    }
+    bookRewriteResult.total_chapters = bookRewriteResult.chapters.length;
+    bookRewriteResult.total_replacements = totalReps;
+    showBookRewriteResult(bookRewriteResult);
+    btn.disabled = false;
+    progEl.style.display = 'none';
+    toast(`整本翻改完成！${totalReps}处替换`,'ok');
+  }
+}
+
+function showBookRewriteResult(data) {
+  // 在结果区显示整本书翻改结果
+  const el = document.getElementById('resultText');
+  let html = '';
+  (data.chapters || []).forEach(ch => {
+    html += `<div style="margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--bd)">
+      <div style="font-size:11px;color:var(--pm);font-weight:bold;margin-bottom:4px">${esc(ch.title)} <span style="color:var(--tx3);font-weight:normal">(${ch.replace_count}处替换)</span></div>`;
+    let chHtml = esc(ch.rewritten);
+    if (ch.replacements) {
+      ch.replacements.forEach(rp => {
+        if (rp.original === '⚠️') return;
+        const rEsc = esc(rp.replacement);
+        chHtml = chHtml.split(rEsc).join(`<span class="diff-new">${rEsc}</span>`);
+      });
+    }
+    html += `<div style="font-size:13px;line-height:1.9;white-space:pre-wrap;word-break:break-all">${chHtml}</div></div>`;
+  });
+  if (!html) html = '<div style="color:var(--tx3)">无翻改结果</div>';
+  el.innerHTML = html;
+  document.getElementById('repInfo').textContent = `${data.total_replacements}处替换 · ${data.total_chapters}章`;
+  document.getElementById('cntR').textContent = el.textContent.length;
+}
 
 // ====== 键盘快捷键 ======
 document.addEventListener('keydown', e => {
