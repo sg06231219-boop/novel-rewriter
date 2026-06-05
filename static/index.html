@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0a0a14">
 <title>小说翻改工具 v6.0</title>
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="/static/manifest.json">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -405,7 +405,7 @@ async function init() {
 // ===== PWA =====
 function registerSW() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+    navigator.serviceWorker.register('/static/sw.js').catch(()=>{});
   }
 }
 
