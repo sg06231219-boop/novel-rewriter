@@ -1,706 +1,653 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小说翻改工具 v3.0</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
-            --bg: #0a0a14; --surface: #12121e; --surface2: #1a1a2e; --surface3: #222240;
-            --border: #2a2a4a; --text: #e0e0e0; --text2: #888; --text3: #555;
-            --primary: #7c5cfc; --primary2: #5a3fd6; --primary-bg: rgba(124,92,252,0.1);
-            --accent: #ff6b9d; --accent-bg: rgba(255,107,157,0.1);
-            --success: #4ecdc4; --warning: #ffe66d; --danger: #ff6b6b;
-        }
-        body { font-family: 'Microsoft YaHei','PingFang SC',sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
-        .app { display: flex; flex-direction: column; height: 100vh; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小说翻改工具</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a14;--sf:#12121e;--sf2:#1a1a2e;--sf3:#222240;--bd:#2a2a4a;--tx:#e0e0e0;--tx2:#999;--tx3:#555;
+--pm:#7c5cfc;--pm2:#5a3fd6;--pmbg:rgba(124,92,252,.1);--ac:#ff6b9d;--ok:#4ecdc4;--wn:#ffe66d;--dg:#ff6b6b}
+body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;background:var(--bg);color:var(--tx);height:100vh;overflow:hidden}
+.app{display:flex;flex-direction:column;height:100vh}
 
-        /* 顶栏 */
-        .topbar {
-            background: var(--surface); border-bottom: 1px solid var(--border);
-            padding: 10px 20px; display: flex; align-items: center; gap: 16px; flex-shrink: 0;
-        }
-        .topbar h1 { font-size: 1.3em; background: linear-gradient(135deg,var(--primary),var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .topbar .badge { font-size: .65em; padding: 2px 8px; background: var(--primary); border-radius: 10px; color: #fff; }
-        .topbar-actions { margin-left: auto; display: flex; gap: 6px; }
+/* 顶栏 */
+.topbar{background:var(--sf);border-bottom:1px solid var(--bd);padding:8px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.topbar h1{font-size:1.2em;background:linear-gradient(135deg,var(--pm),var(--ac));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar .ver{font-size:.6em;padding:2px 7px;background:var(--pm);border-radius:10px;color:#fff}
+.topbar-right{margin-left:auto;display:flex;gap:6px;align-items:center}
 
-        /* 按钮 */
-        .btn { padding: 7px 14px; border: none; border-radius: 7px; font-size: 12px; cursor: pointer; transition: all .2s; font-weight: 500; display: inline-flex; align-items: center; gap: 5px; }
-        .btn-primary { background: linear-gradient(135deg,var(--primary),var(--primary2)); color: #fff; }
-        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,92,252,.4); }
-        .btn-ghost { background: var(--surface3); color: var(--text); border: 1px solid var(--border); }
-        .btn-ghost:hover { background: var(--border); }
-        .btn-accent { background: linear-gradient(135deg,var(--accent),#ff4d8a); color: #fff; }
-        .btn-danger { background: var(--danger); color: #fff; }
-        .btn-sm { padding: 4px 9px; font-size: 11px; }
-        .btn-xs { padding: 2px 6px; font-size: 10px; border-radius: 4px; }
+/* 通用按钮 */
+.btn{padding:6px 12px;border:none;border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s;font-weight:500;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.btn:active{transform:scale(.97)}
+.btn-p{background:linear-gradient(135deg,var(--pm),var(--pm2));color:#fff}
+.btn-p:hover{box-shadow:0 3px 10px rgba(124,92,252,.4)}
+.btn-g{background:var(--sf3);color:var(--tx);border:1px solid var(--bd)}
+.btn-g:hover{background:var(--bd)}
+.btn-a{background:linear-gradient(135deg,var(--ac),#ff4d8a);color:#fff}
+.btn-ok{background:var(--ok);color:var(--bg)}
+.btn-d{background:var(--dg);color:#fff}
+.btn-sm{padding:4px 8px;font-size:11px}
+.btn-xs{padding:2px 6px;font-size:10px;border-radius:4px}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
 
-        /* 主体三栏 */
-        .main { flex: 1; display: flex; overflow: hidden; }
+/* 三栏 */
+.main{flex:1;display:flex;overflow:hidden}
 
-        /* 左栏：书库 */
-        .panel-books {
-            width: 240px; background: var(--surface); border-right: 1px solid var(--border);
-            display: flex; flex-direction: column; flex-shrink: 0; transition: width .3s;
-        }
-        .panel-books.collapsed { width: 0; overflow: hidden; border: none; }
-        .panel-header {
-            padding: 12px 14px; border-bottom: 1px solid var(--border);
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .panel-header h2 { font-size: .9em; }
-        .panel-body { flex: 1; overflow-y: auto; padding: 8px; }
+/* 左栏 书库 */
+.panel-l{width:260px;background:var(--sf);border-right:1px solid var(--bd);display:flex;flex-direction:column;flex-shrink:0;transition:width .3s}
+.panel-l.hide{width:0;overflow:hidden;border:none}
+.ph{padding:10px 12px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between}
+.ph h2{font-size:.85em}
+.pb{flex:1;overflow-y:auto;padding:6px}
 
-        .book-item {
-            padding: 8px 10px; border-radius: 6px; cursor: pointer; margin-bottom: 4px;
-            transition: background .15s; display: flex; align-items: center; gap: 8px;
-        }
-        .book-item:hover { background: var(--surface3); }
-        .book-item.active { background: var(--primary-bg); border-left: 3px solid var(--primary); }
-        .book-item .book-icon { font-size: 1.1em; }
-        .book-item .book-info { flex: 1; min-width: 0; }
-        .book-item .book-title { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .book-item .book-meta { font-size: 10px; color: var(--text3); margin-top: 2px; }
-        .book-item .book-del { opacity: 0; color: var(--text3); cursor: pointer; font-size: 14px; padding: 0 4px; }
-        .book-item:hover .book-del { opacity: 1; }
-        .book-item .book-del:hover { color: var(--danger); }
+.book-search{padding:6px 8px}
+.book-search input{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:5px;padding:5px 8px;color:var(--tx);font-size:12px}
+.book-search input:focus{outline:none;border-color:var(--pm)}
 
-        .chapter-item {
-            padding: 6px 10px 6px 28px; border-radius: 4px; cursor: pointer;
-            font-size: 11px; color: var(--text2); transition: all .15s; margin-bottom: 2px;
-        }
-        .chapter-item:hover { background: var(--surface3); color: var(--text); }
-        .chapter-item.active { color: var(--primary); background: var(--primary-bg); }
+.bk{padding:8px 10px;border-radius:6px;cursor:pointer;margin-bottom:2px;transition:background .12s;display:flex;align-items:center;gap:8px}
+.bk:hover{background:var(--sf3)}
+.bk.on{background:var(--pmbg);border-left:3px solid var(--pm)}
+.bk .bi{font-size:1.1em}
+.bk .bn{flex:1;min-width:0;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk .bm{font-size:10px;color:var(--tx3)}
+.bk .bx{opacity:0;color:var(--tx3);cursor:pointer;font-size:14px;padding:0 4px;flex-shrink:0}
+.bk:hover .bx{opacity:1}
+.bk .bx:hover{color:var(--dg)}
 
-        /* 中栏：替换规则 */
-        .panel-rules {
-            width: 300px; background: var(--surface); border-right: 1px solid var(--border);
-            display: flex; flex-direction: column; flex-shrink: 0;
-        }
-        .rule-card {
-            background: var(--surface2); border: 1px solid var(--border); border-radius: 7px;
-            padding: 8px 10px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;
-            transition: border-color .2s;
-        }
-        .rule-card:hover { border-color: var(--primary); }
-        .rule-card .arrow { color: var(--primary); font-weight: bold; font-size: 1em; }
-        .rule-card input {
-            flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 5px;
-            padding: 5px 8px; color: var(--text); font-size: 12px; min-width: 0;
-        }
-        .rule-card input:focus { outline: none; border-color: var(--primary); }
-        .rule-card .del-btn { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 14px; padding: 0 4px; border-radius: 3px; }
-        .rule-card .del-btn:hover { color: var(--danger); }
+.ch{padding:5px 10px 5px 30px;border-radius:4px;cursor:pointer;font-size:11px;color:var(--tx2);transition:all .12s;margin-bottom:1px}
+.ch:hover{background:var(--sf3);color:var(--tx)}
+.ch.on{color:var(--pm);background:var(--pmbg)}
+.ch-add{padding:5px 10px 5px 30px;border-radius:4px;cursor:pointer;font-size:11px;color:var(--pm);text-align:center}
 
-        .category-tag { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: bold; margin-right: 3px; }
-        .tag-person { background: rgba(78,205,196,.15); color: var(--success); }
-        .tag-location { background: rgba(255,230,109,.15); color: var(--warning); }
-        .tag-organization { background: rgba(124,92,252,.15); color: var(--primary); }
+/* 中栏 规则 */
+.panel-m{width:290px;background:var(--sf);border-right:1px solid var(--bd);display:flex;flex-direction:column;flex-shrink:0}
 
-        .extract-panel { background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 10px; margin-top: 10px; display: none; }
-        .extract-panel.show { display: block; }
-        .extract-panel h3 { font-size: .8em; color: var(--text2); margin-bottom: 6px; }
-        .name-chip {
-            display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px;
-            margin: 2px; cursor: pointer; transition: all .15s; border: 1px solid var(--border); background: var(--bg);
-        }
-        .name-chip:hover { border-color: var(--primary); background: var(--primary-bg); }
-        .name-chip.selected { border-color: var(--primary); background: rgba(124,92,252,.25); }
+.rc{background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:6px 8px;margin-bottom:5px;display:flex;align-items:center;gap:5px}
+.rc:hover{border-color:var(--pm)}
+.rc .ar{color:var(--pm);font-weight:bold}
+.rc input{flex:1;background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:4px 7px;color:var(--tx);font-size:12px;min-width:0}
+.rc input:focus{outline:none;border-color:var(--pm)}
+.rc .dx{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:14px;padding:0 3px}
+.rc .dx:hover{color:var(--dg)}
 
-        /* 规则模板 */
-        .rules-template {
-            margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
-        }
-        .rules-template h3 { font-size: .8em; color: var(--text2); margin-bottom: 6px; }
-        .template-item {
-            padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;
-            color: var(--text2); display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 2px; transition: all .15s;
-        }
-        .template-item:hover { background: var(--surface3); color: var(--text); }
+.tag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:bold;margin-right:3px}
+.tag-p{background:rgba(78,205,196,.15);color:var(--ok)}
+.tag-l{background:rgba(255,230,109,.15);color:var(--wn)}
+.tag-o{background:rgba(124,92,252,.15);color:var(--pm)}
 
-        /* 右栏：编辑器 */
-        .editor-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.ep{background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:10px;margin-top:8px;display:none}
+.ep.show{display:block}
+.ep h3{font-size:.78em;color:var(--tx2);margin-bottom:6px}
+.nc{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;margin:2px;cursor:pointer;transition:all .12s;border:1px solid var(--bd);background:var(--bg)}
+.nc:hover{border-color:var(--pm);background:var(--pmbg)}
+.nc.sel{border-color:var(--pm);background:rgba(124,92,252,.25)}
 
-        .toolbar {
-            background: var(--surface); border-bottom: 1px solid var(--border);
-            padding: 7px 14px; display: flex; align-items: center; gap: 10px; flex-shrink: 0;
-        }
-        .toolbar .sep { width: 1px; height: 18px; background: var(--border); }
-        .toolbar label { font-size: 11px; color: var(--text2); display: flex; align-items: center; gap: 5px; }
-        .toolbar select, .toolbar input[type="text"] {
-            background: var(--bg); border: 1px solid var(--border); border-radius: 5px;
-            padding: 3px 7px; color: var(--text); font-size: 11px;
-        }
-        .toolbar select:focus, .toolbar input[type="text"]:focus { outline: none; border-color: var(--primary); }
-        .toolbar input[type="checkbox"] { accent-color: var(--primary); }
+.tp-item{padding:5px 8px;border-radius:4px;cursor:pointer;font-size:11px;color:var(--tx2);display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+.tp-item:hover{background:var(--sf3);color:var(--tx)}
 
-        .compare { flex: 1; display: flex; overflow: hidden; }
-        .compare-pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        .compare-pane + .compare-pane { border-left: 1px solid var(--border); }
-        .pane-header {
-            padding: 7px 14px; background: var(--surface2); border-bottom: 1px solid var(--border);
-            font-size: 11px; color: var(--text2); display: flex; align-items: center; gap: 6px;
-        }
-        .pane-header .dot { width: 7px; height: 7px; border-radius: 50%; }
-        .pane-body { flex: 1; overflow-y: auto; padding: 14px; }
-        textarea.pane-input {
-            width: 100%; height: 100%; background: var(--bg); border: none; color: var(--text);
-            font-size: 13px; line-height: 1.8; resize: none; font-family: inherit;
-        }
-        textarea.pane-input:focus { outline: none; }
-        .result-text { font-size: 13px; line-height: 1.8; white-space: pre-wrap; word-break: break-all; }
+/* 右栏 编辑器 */
+.panel-r{flex:1;display:flex;flex-direction:column;overflow:hidden}
 
-        .stats-bar {
-            background: var(--surface); border-top: 1px solid var(--border);
-            padding: 5px 14px; font-size: 11px; color: var(--text3); display: flex; gap: 14px; flex-shrink: 0;
-        }
-        .stats-bar .stat-val { color: var(--primary); font-weight: bold; }
+.toolbar{background:var(--sf);border-bottom:1px solid var(--bd);padding:6px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.toolbar .sep{width:1px;height:16px;background:var(--bd)}
+.toolbar label{font-size:11px;color:var(--tx2);display:flex;align-items:center;gap:4px;cursor:pointer}
+.toolbar select{background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:3px 6px;color:var(--tx);font-size:11px}
+.toolbar select:focus{outline:none;border-color:var(--pm)}
+.toolbar input[type=checkbox]{accent-color:var(--pm)}
+.toolbar .counter{margin-left:auto;font-size:11px;color:var(--tx3)}
 
-        /* 模态框 */
-        .modal-overlay {
-            position: fixed; inset: 0; background: rgba(10,10,20,.85);
-            display: none; align-items: center; justify-content: center; z-index: 999;
-        }
-        .modal-overlay.show { display: flex; }
-        .modal {
-            background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-            padding: 20px; width: 400px; max-width: 90vw;
-        }
-        .modal h2 { font-size: 1.1em; margin-bottom: 10px; }
-        .modal p { color: var(--text2); font-size: 12px; margin-bottom: 14px; line-height: 1.6; }
-        .modal input[type="text"], .modal textarea {
-            width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
-            padding: 8px 10px; color: var(--text); font-size: 13px; margin-bottom: 10px;
-        }
-        .modal input:focus, .modal textarea:focus { outline: none; border-color: var(--primary); }
-        .modal textarea { height: 80px; resize: vertical; font-family: inherit; }
-        .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.cmp{flex:1;display:flex;overflow:hidden}
+.cmp-p{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.cmp-p+.cmp-p{border-left:1px solid var(--bd)}
+.cmp-h{padding:6px 12px;background:var(--sf2);border-bottom:1px solid var(--bd);font-size:11px;color:var(--tx2);display:flex;align-items:center;gap:6px}
+.cmp-h .dot{width:6px;height:6px;border-radius:50%}
+.cmp-b{flex:1;overflow-y:auto;padding:12px}
+textarea.ed{width:100%;height:100%;background:var(--bg);border:none;color:var(--tx);font-size:13px;line-height:1.9;resize:none;font-family:inherit}
+textarea.ed:focus{outline:none}
+.result{font-size:13px;line-height:1.9;white-space:pre-wrap;word-break:break-all}
+.diff-old{background:rgba(255,107,107,.15);text-decoration:line-through;color:var(--dg)}
+.diff-new{background:rgba(78,205,196,.15);color:var(--ok)}
 
-        .loading-overlay {
-            position: fixed; inset: 0; background: rgba(10,10,20,.8);
-            display: none; align-items: center; justify-content: center; z-index: 1000;
-            flex-direction: column; gap: 14px;
-        }
-        .loading-overlay.show { display: flex; }
-        .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+.sbar{background:var(--sf);border-top:1px solid var(--bd);padding:4px 12px;font-size:11px;color:var(--tx3);display:flex;gap:12px;flex-shrink:0}
+.sbar .v{color:var(--pm);font-weight:bold}
 
-        .toast {
-            position: fixed; top: 16px; right: 16px; padding: 10px 18px; border-radius: 7px;
-            font-size: 12px; z-index: 2000; transform: translateX(120%); transition: transform .3s;
-        }
-        .toast.show { transform: translateX(0); }
-        .toast-success { background: var(--success); color: var(--bg); }
-        .toast-error { background: var(--danger); color: #fff; }
-        .toast-warning { background: var(--warning); color: var(--bg); }
+/* 模态 */
+.modal-bg{position:fixed;inset:0;background:rgba(10,10,20,.85);display:none;align-items:center;justify-content:center;z-index:999}
+.modal-bg.show{display:flex}
+.modal{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:20px;width:420px;max-width:92vw;max-height:90vh;overflow-y:auto}
+.modal h2{font-size:1.05em;margin-bottom:8px}
+.modal p{color:var(--tx2);font-size:12px;margin-bottom:12px;line-height:1.6}
+.modal input[type=text],.modal textarea{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:7px 10px;color:var(--tx);font-size:13px;margin-bottom:8px}
+.modal input:focus,.modal textarea:focus{outline:none;border-color:var(--pm)}
+.modal textarea{height:100px;resize:vertical;font-family:inherit}
+.modal-act{display:flex;gap:8px;justify-content:flex-end}
 
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+/* Loading */
+.ld-bg{position:fixed;inset:0;background:rgba(10,10,20,.8);display:none;align-items:center;justify-content:center;z-index:1000;flex-direction:column;gap:12px}
+.ld-bg.show{display:flex}
+.spin{width:32px;height:32px;border:3px solid var(--bd);border-top-color:var(--pm);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.ld-text{font-size:13px;color:var(--tx2)}
 
-        .empty-hint { text-align: center; padding: 30px 14px; color: var(--text3); font-size: 12px; line-height: 1.8; }
-        .empty-hint .emoji { font-size: 2em; display: block; margin-bottom: 8px; }
-    </style>
+/* Toast */
+.toast{position:fixed;top:14px;right:14px;padding:8px 16px;border-radius:6px;font-size:12px;z-index:2000;transform:translateX(120%);transition:transform .25s}
+.toast.show{transform:translateX(0)}
+.toast-ok{background:var(--ok);color:var(--bg)}
+.toast-err{background:var(--dg);color:#fff}
+.toast-wn{background:var(--wn);color:var(--bg)}
+
+/* 空提示 */
+.empty{text-align:center;padding:24px 12px;color:var(--tx3);font-size:12px;line-height:1.8}
+.empty .e{font-size:2em;display:block;margin-bottom:6px}
+
+/* 批量添加规则 */
+.batch-area{background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:8px;margin-bottom:8px;display:none}
+.batch-area.show{display:block}
+.batch-area textarea{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:6px;color:var(--tx);font-size:12px;height:80px;resize:vertical;font-family:inherit}
+.batch-area textarea:focus{outline:none;border-color:var(--pm)}
+.batch-area p{font-size:10px;color:var(--tx3);margin-top:4px}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--tx3)}
+</style>
 </head>
 <body>
 <div class="app">
-    <div class="topbar">
-        <button class="btn btn-ghost btn-sm" onclick="toggleBookPanel()" title="书库">📚</button>
-        <h1>📖 小说翻改工具</h1>
-        <span class="badge">v3.0</span>
-        <div class="topbar-actions">
-            <button class="btn btn-ghost btn-sm" onclick="showApiKeyModal()">🔑 API</button>
-            <button class="btn btn-ghost btn-sm" onclick="downloadResult()">💾 下载</button>
-            <button class="btn btn-ghost btn-sm" onclick="clearAll()">🗑️ 清空</button>
-        </div>
+  <div class="topbar">
+    <button class="btn btn-g btn-sm" onclick="toggleLeft()" title="书库">📚</button>
+    <h1>📖 小说翻改工具</h1><span class="ver">v3.1</span>
+    <div class="topbar-right">
+      <button class="btn btn-g btn-sm" onclick="showModal('apiModal')">🔑 API</button>
+      <button class="btn btn-g btn-sm" onclick="downloadResult()">💾 下载</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- 左栏 书库 -->
+    <div class="panel-l" id="panelL">
+      <div class="ph"><h2>📚 书库</h2><button class="btn btn-p btn-xs" onclick="showModal('addBookModal')">+ 新书</button></div>
+      <div class="book-search"><input id="bookSearch" placeholder="搜索书名/作者..." oninput="filterBooks()"></div>
+      <div class="pb" id="bookList"></div>
     </div>
 
-    <div class="main">
-        <!-- 左栏：书库 -->
-        <div class="panel-books" id="bookPanel">
-            <div class="panel-header">
-                <h2>📚 书库</h2>
-                <button class="btn btn-primary btn-xs" onclick="showAddBookModal()">+ 新书</button>
-            </div>
-            <div class="panel-body" id="bookList">
-                <div class="empty-hint"><span class="emoji">📚</span>点击「+ 新书」<br>添加你的小说</div>
-            </div>
+    <!-- 中栏 规则 -->
+    <div class="panel-m">
+      <div class="ph">
+        <h2>🔄 替换规则</h2>
+        <div style="display:flex;gap:3px">
+          <button class="btn btn-g btn-xs" onclick="toggleBatch()" title="批量添加">📝</button>
+          <button class="btn btn-g btn-xs" onclick="showModal('saveTpModal')" title="保存模板">💾</button>
+          <button class="btn btn-p btn-xs" onclick="addRule()">+ 添加</button>
         </div>
-
-        <!-- 中栏：替换规则 -->
-        <div class="panel-rules">
-            <div class="panel-header">
-                <h2>🔄 替换规则</h2>
-                <div style="display:flex;gap:4px;">
-                    <button class="btn btn-ghost btn-xs" onclick="showSaveRulesModal()" title="保存为模板">💾</button>
-                    <button class="btn btn-primary btn-xs" onclick="addRule()">+ 添加</button>
-                </div>
-            </div>
-            <div class="panel-body">
-                <div id="rulesContainer"></div>
-                <div style="margin-top:8px;">
-                    <button class="btn btn-accent btn-sm" onclick="extractNames()" style="width:100%;">🧠 智能提取名称</button>
-                </div>
-                <div class="extract-panel" id="extractPanel">
-                    <h3>提取结果（点击添加到规则）</h3>
-                    <div id="extractResults"></div>
-                </div>
-                <div class="rules-template" id="rulesTemplate">
-                    <h3>📦 已保存模板</h3>
-                    <div id="templateList"></div>
-                </div>
-            </div>
-            <div style="padding:10px;border-top:1px solid var(--border);">
-                <button class="btn btn-primary" onclick="rewrite()" style="width:100%;padding:10px;">🚀 开始翻改</button>
-            </div>
+      </div>
+      <div class="pb">
+        <div class="batch-area" id="batchArea">
+          <textarea id="batchInput" placeholder="每行一条，格式：原名→新名&#10;例：&#10;萧炎→林焱&#10;药老→魂老"></textarea>
+          <p>每行一条，用 → 或 = 分隔</p>
+          <button class="btn btn-p btn-sm" onclick="parseBatch()" style="width:100%;margin-top:4px">批量添加</button>
         </div>
-
-        <!-- 右栏：编辑器 -->
-        <div class="editor-area">
-            <div class="toolbar">
-                <label><input type="checkbox" id="useAi" onchange="toggleAiOptions()"> AI改写</label>
-                <div class="sep" id="aiSep" style="display:none;"></div>
-                <label id="aiIntensityLabel" style="display:none;">强度：<select id="aiIntensity"><option value="light">轻微</option><option value="medium" selected>中等</option><option value="heavy">大幅</option></select></label>
-                <div style="margin-left:auto;font-size:11px;color:var(--text3);">原文 <span id="origCount">0</span> 字 → 改写 <span id="rewritCount">0</span> 字</div>
-            </div>
-            <div class="compare">
-                <div class="compare-pane">
-                    <div class="pane-header"><div class="dot" style="background:var(--warning);"></div>原文</div>
-                    <div class="pane-body"><textarea class="pane-input" id="originalText" placeholder="在这里粘贴小说原文...&#10;&#10;也可以从左侧书库加载章节。" oninput="updateCounts()"></textarea></div>
-                </div>
-                <div class="compare-pane">
-                    <div class="pane-header"><div class="dot" style="background:var(--success);"></div>改写结果</div>
-                    <div class="pane-body"><div class="result-text" id="rewrittenText">改写结果将在这里显示...</div></div>
-                </div>
-            </div>
-            <div class="stats-bar">
-                <div>替换规则: <span class="stat-val" id="ruleCount">0</span></div>
-                <div>替换次数: <span class="stat-val" id="replaceCount">0</span></div>
-                <div id="aiStatus" style="display:none;">AI: <span class="stat-val">关闭</span></div>
-            </div>
+        <div id="rulesBox"></div>
+        <div style="margin-top:8px">
+          <button class="btn btn-a btn-sm" onclick="extractNames()" style="width:100%">🧠 智能提取名称</button>
         </div>
+        <div class="ep" id="extPanel">
+          <h3>提取结果（点击添加到规则）</h3>
+          <div id="extResults"></div>
+        </div>
+        <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bd)">
+          <div style="font-size:.78em;color:var(--tx2);margin-bottom:4px">📦 已保存模板</div>
+          <div id="tpList"></div>
+        </div>
+      </div>
+      <div style="padding:8px;border-top:1px solid var(--bd)">
+        <button class="btn btn-p" onclick="doRewrite()" style="width:100%;padding:9px;font-size:13px">🚀 开始翻改</button>
+      </div>
     </div>
+
+    <!-- 右栏 编辑器 -->
+    <div class="panel-r">
+      <div class="toolbar">
+        <label><input type="checkbox" id="useAi" onchange="toggleAi()"> AI改写</label>
+        <div class="sep" id="aiSep" style="display:none"></div>
+        <label id="aiLbl" style="display:none">强度 <select id="aiLv"><option value="light">轻微</option><option value="medium" selected>中等</option><option value="heavy">大幅</option></select></label>
+        <div class="sep" id="diffSep" style="display:none"></div>
+        <label id="diffLbl" style="display:none"><input type="checkbox" id="showDiff" checked onchange="refreshResult()"> 差异高亮</label>
+        <div class="counter">原文 <span id="cntO">0</span> 字 → 改写 <span id="cntR">0</span> 字</div>
+      </div>
+      <div class="cmp">
+        <div class="cmp-p">
+          <div class="cmp-h"><div class="dot" style="background:var(--wn)"></div>原文</div>
+          <div class="cmp-b"><textarea class="ed" id="origText" placeholder="粘贴小说原文，或从左侧书库加载章节..." oninput="updateCnt()"></textarea></div>
+        </div>
+        <div class="cmp-p">
+          <div class="cmp-h"><div class="dot" style="background:var(--ok)"></div>改写结果 <span id="repInfo" style="margin-left:auto;font-size:10px"></span></div>
+          <div class="cmp-b"><div class="result" id="resultText">等待翻改...</div></div>
+        </div>
+      </div>
+      <div class="sbar">
+        <div>规则: <span class="v" id="sRules">0</span></div>
+        <div>替换: <span class="v" id="sReps">0</span></div>
+        <div id="sAi" style="display:none">AI: <span class="v">开启</span></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Loading -->
-<div class="loading-overlay" id="loading"><div class="spinner"></div><div class="loading-text" id="loadingText">处理中...</div></div>
+<div class="ld-bg" id="ldBg"><div class="spin"></div><div class="ld-text" id="ldText">处理中...</div></div>
 
-<!-- API Key 模态 -->
-<div class="modal-overlay" id="apiKeyModal">
-    <div class="modal">
-        <h2>🔑 设置 API Key</h2>
-        <p>AI改写需要智谱API Key。<br><a href="https://open.bigmodel.cn" target="_blank" style="color:var(--primary);">open.bigmodel.cn</a> 免费注册获取。</p>
-        <input type="text" id="apiKeyInput" placeholder="输入智谱 API Key">
-        <div class="modal-actions"><button class="btn btn-ghost" onclick="hideModal('apiKeyModal')">取消</button><button class="btn btn-primary" onclick="saveApiKey()">保存</button></div>
-    </div>
+<!-- API Key -->
+<div class="modal-bg" id="apiModal">
+  <div class="modal">
+    <h2>🔑 智谱 API Key</h2>
+    <p>AI改写需要智谱API Key。<br><a href="https://open.bigmodel.cn" target="_blank" style="color:var(--pm)">open.bigmodel.cn</a> 免费注册。</p>
+    <input type="text" id="apiKeyIn" placeholder="输入智谱 API Key">
+    <div class="modal-act"><button class="btn btn-g" onclick="hideModal('apiModal')">取消</button><button class="btn btn-p" onclick="saveApiKey()">保存</button></div>
+  </div>
 </div>
 
-<!-- 新建书籍模态 -->
-<div class="modal-overlay" id="addBookModal">
-    <div class="modal">
-        <h2>📚 新建书籍</h2>
-        <input type="text" id="bookTitle" placeholder="书名（如：斗破苍穹）">
-        <input type="text" id="bookAuthor" placeholder="作者（选填）">
-        <textarea id="bookContent" placeholder="粘贴章节内容（选填，之后也可以逐章添加）&#10;&#10;支持一次性粘贴整章文本"></textarea>
-        <div class="modal-actions"><button class="btn btn-ghost" onclick="hideModal('addBookModal')">取消</button><button class="btn btn-primary" onclick="createBook()">创建</button></div>
-    </div>
+<!-- 新建书籍 -->
+<div class="modal-bg" id="addBookModal">
+  <div class="modal">
+    <h2>📚 新建书籍</h2>
+    <input type="text" id="newBookTitle" placeholder="书名（如：斗破苍穹）">
+    <input type="text" id="newBookAuthor" placeholder="作者（选填）">
+    <textarea id="newBookContent" placeholder="粘贴章节内容（选填，创建后可逐章添加）"></textarea>
+    <div class="modal-act"><button class="btn btn-g" onclick="hideModal('addBookModal')">取消</button><button class="btn btn-p" onclick="createBook()">创建</button></div>
+  </div>
 </div>
 
-<!-- 添加章节模态 -->
-<div class="modal-overlay" id="addChapterModal">
-    <div class="modal">
-        <h2>📝 添加章节</h2>
-        <input type="text" id="chapterTitle" placeholder="章节标题（如：第一章 陨落的天才）">
-        <textarea id="chapterContent" placeholder="粘贴章节内容..."></textarea>
-        <div class="modal-actions"><button class="btn btn-ghost" onclick="hideModal('addChapterModal')">取消</button><button class="btn btn-primary" onclick="addChapter()">添加</button></div>
-    </div>
+<!-- 添加章节 -->
+<div class="modal-bg" id="addChModal">
+  <div class="modal">
+    <h2>📝 添加章节</h2>
+    <input type="text" id="newChTitle" placeholder="章节标题">
+    <textarea id="newChContent" placeholder="粘贴章节内容..."></textarea>
+    <div class="modal-act"><button class="btn btn-g" onclick="hideModal('addChModal')">取消</button><button class="btn btn-p" onclick="addChapter()">添加</button></div>
+  </div>
 </div>
 
-<!-- 保存规则模板模态 -->
-<div class="modal-overlay" id="saveRulesModal">
-    <div class="modal">
-        <h2>💾 保存规则模板</h2>
-        <input type="text" id="rulesTemplateName" placeholder="模板名称（如：斗破→武动）">
-        <div class="modal-actions"><button class="btn btn-ghost" onclick="hideModal('saveRulesModal')">取消</button><button class="btn btn-primary" onclick="saveRulesTemplate()">保存</button></div>
-    </div>
+<!-- 保存模板 -->
+<div class="modal-bg" id="saveTpModal">
+  <div class="modal">
+    <h2>💾 保存规则模板</h2>
+    <input type="text" id="tpName" placeholder="模板名称（如：斗破→武动）">
+    <div class="modal-act"><button class="btn btn-g" onclick="hideModal('saveTpModal')">取消</button><button class="btn btn-p" onclick="saveTemplate()">保存</button></div>
+  </div>
 </div>
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script>
-const API = '';  // 同源
-let apiKey = localStorage.getItem('novel_rewriter_apikey') || '';
-let currentBookId = null;
-let currentChapterId = null;
+const API = '';
+let apiKey = localStorage.getItem('nr_apikey') || '';
+let curBook = null, curCh = null;
+let allBooks = [];
+let lastRewriteData = null; // 保存最近一次翻改结果，用于切换高亮
 
-// ============ 初始化 ============
+// ====== 初始化 ======
 async function init() {
-    addRule();
-    await loadBooks();
-    await loadRulesTemplates();
-    updateCounts();
+  addRule();
+  await loadBooks();
+  await loadTemplates();
+  updateCnt();
 }
 
-// ============ 书库 ============
+// ====== 书库 ======
 async function loadBooks() {
-    try {
-        const resp = await fetch(`${API}/api/books`);
-        const data = await resp.json();
-        renderBookList(data.books);
-    } catch(e) { console.error(e); }
+  try {
+    const r = await fetch(`${API}/api/books`);
+    const d = await r.json();
+    allBooks = d.books || [];
+    renderBooks();
+  } catch(e) { console.error(e); }
 }
 
-function renderBookList(books) {
-    const el = document.getElementById('bookList');
-    if (!books.length) {
-        el.innerHTML = '<div class="empty-hint"><span class="emoji">📚</span>点击「+ 新书」<br>添加你的小说</div>';
-        return;
-    }
-    el.innerHTML = '';
-    books.forEach(b => {
-        const div = document.createElement('div');
-        div.innerHTML = `
-            <div class="book-item ${b.id===currentBookId?'active':''}" onclick="selectBook('${b.id}')">
-                <span class="book-icon">📖</span>
-                <div class="book-info">
-                    <div class="book-title">${esc(b.title)}</div>
-                    <div class="book-meta">${b.author?esc(b.author)+' · ':''}${b.chapter_count}章</div>
-                </div>
-                <span class="book-del" onclick="event.stopPropagation();deleteBook('${b.id}')" title="删除">×</span>
-            </div>
-        `;
-        el.appendChild(div);
-    });
+function renderBooks() {
+  const el = document.getElementById('bookList');
+  const q = (document.getElementById('bookSearch')?.value || '').toLowerCase();
+  const filtered = q ? allBooks.filter(b => b.title.toLowerCase().includes(q) || (b.author||'').toLowerCase().includes(q)) : allBooks;
+  if (!filtered.length) { el.innerHTML = '<div class="empty"><span class="e">📚</span>暂无书籍</div>'; return; }
+  let html = '';
+  filtered.forEach(b => {
+    const on = b.id === curBook ? ' on' : '';
+    html += `<div class="bk${on}" data-id="${b.id}" onclick="selectBook('${b.id}')">
+      <span class="bi">📖</span>
+      <div style="flex:1;min-width:0"><div class="bn">${esc(b.title)}</div><div class="bm">${b.author?esc(b.author)+' · ':''}${b.chapter_count}章</div></div>
+      <span class="bx" onclick="event.stopPropagation();deleteBook('${b.id}')" title="删除">×</span>
+    </div>`;
+  });
+  el.innerHTML = html;
 }
 
-async function selectBook(bookId) {
-    currentBookId = bookId;
-    currentChapterId = null;
-    try {
-        const resp = await fetch(`${API}/api/books/${bookId}`);
-        const book = await resp.json();
-        renderBookList((await (await fetch(`${API}/api/books`)).json()).books);
-        renderChapterList(book);
-    } catch(e) { showToast('加载失败','error'); }
+function filterBooks() { renderBooks(); if (curBook) renderChapters(); }
+
+async function selectBook(id) {
+  if (curBook === id) { curBook = null; curCh = null; renderBooks(); return; }
+  curBook = id; curCh = null;
+  try {
+    const r = await fetch(`${API}/api/books/${id}`);
+    const book = await r.json();
+    renderBooks();
+    renderChapters(book);
+  } catch(e) { toast('加载失败','err'); }
 }
 
-function renderChapterList(book) {
-    const el = document.getElementById('bookList');
-    // 先渲染书籍列表，再展开章节
-    renderBookList((await (await fetch(`${API}/api/books`)).json()).books);  // won't work in sync
-    // 直接追加章节
-    const chapters = book.chapters || [];
-    if (chapters.length) {
-        const existing = el.querySelectorAll('.chapter-item');
-        existing.forEach(e => e.remove());
-        chapters.forEach(ch => {
-            const div = document.createElement('div');
-            div.className = `chapter-item ${ch.id===currentChapterId?'active':''}`;
-            div.textContent = ch.title;
-            div.onclick = () => loadChapter(book.id, ch.id, ch);
-            el.appendChild(div);
-        });
-    }
-    // 添加章节按钮
-    const addBtn = document.createElement('div');
-    addBtn.innerHTML = `<div class="chapter-item" style="color:var(--primary);cursor:pointer;text-align:center;" onclick="showAddChapterModal()">+ 添加章节</div>`;
-    el.appendChild(addBtn);
+function renderChapters(book) {
+  const el = document.getElementById('bookList');
+  // 移除旧章节
+  el.querySelectorAll('.ch,.ch-add').forEach(e => e.remove());
+  const chs = book.chapters || [];
+  chs.forEach(ch => {
+    const d = document.createElement('div');
+    d.className = 'ch' + (ch.id === curCh ? ' on' : '');
+    d.textContent = ch.title;
+    d.onclick = (ev) => { ev.stopPropagation(); loadChapter(ch, d); };
+    el.appendChild(d);
+  });
+  const addD = document.createElement('div');
+  addD.className = 'ch-add';
+  addD.textContent = '+ 添加章节';
+  addD.onclick = (ev) => { ev.stopPropagation(); showModal('addChModal'); };
+  el.appendChild(addD);
 }
 
-// 修复 renderChapterList 的 async 问题
-async function selectBook(bookId) {
-    currentBookId = bookId;
-    currentChapterId = null;
-    try {
-        const resp = await fetch(`${API}/api/books/${bookId}`);
-        const book = await resp.json();
-        const listResp = await fetch(`${API}/api/books`);
-        const listData = await listResp.json();
-        renderBookList(listData.books);
-        // 追加章节
-        const el = document.getElementById('bookList');
-        (book.chapters||[]).forEach(ch => {
-            const div = document.createElement('div');
-            div.className = `chapter-item ${ch.id===currentChapterId?'active':''}`;
-            div.textContent = ch.title;
-            div.onclick = () => loadChapter(book.id, ch.id, ch);
-            el.appendChild(div);
-        });
-        const addBtn = document.createElement('div');
-        addBtn.className = 'chapter-item';
-        addBtn.style.cssText = 'color:var(--primary);text-align:center;';
-        addBtn.textContent = '+ 添加章节';
-        addBtn.onclick = showAddChapterModal;
-        el.appendChild(addBtn);
-    } catch(e) { showToast('加载失败','error'); }
+function loadChapter(ch, el) {
+  curCh = ch.id;
+  document.getElementById('origText').value = ch.content;
+  updateCnt();
+  document.querySelectorAll('.ch').forEach(e => e.classList.remove('on'));
+  if (el) el.classList.add('on');
+  toast(`已加载「${ch.title}」`,'ok');
 }
-
-function loadChapter(bookId, chId, ch) {
-    currentChapterId = chId;
-    document.getElementById('originalText').value = ch.content;
-    updateCounts();
-    // 更新高亮
-    document.querySelectorAll('.chapter-item').forEach(el => el.classList.remove('active'));
-    event.target.classList.add('active');
-    showToast(`已加载「${ch.title}」`, 'success');
-}
-
-function showAddBookModal() { showModal('addBookModal'); }
 
 async function createBook() {
-    const title = document.getElementById('bookTitle').value.trim();
-    if (!title) { showToast('请输入书名','warning'); return; }
-    const author = document.getElementById('bookAuthor').value.trim();
-    const content = document.getElementById('bookContent').value.trim();
-    const chapters = [];
-    if (content) {
-        chapters.push({ title: '第一章', content });
-    }
-    try {
-        const resp = await fetch(`${API}/api/books`, {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ title, author, chapters })
-        });
-        const data = await resp.json();
-        hideModal('addBookModal');
-        document.getElementById('bookTitle').value = '';
-        document.getElementById('bookAuthor').value = '';
-        document.getElementById('bookContent').value = '';
-        showToast(`书籍「${title}」已创建`, 'success');
-        await loadBooks();
-        await selectBook(data.id);
-    } catch(e) { showToast('创建失败','error'); }
-}
-
-function showAddChapterModal() {
-    if (!currentBookId) { showToast('请先选择一本书','warning'); return; }
-    showModal('addChapterModal');
+  const title = document.getElementById('newBookTitle').value.trim();
+  if (!title) { toast('请输入书名','wn'); return; }
+  const author = document.getElementById('newBookAuthor').value.trim();
+  const content = document.getElementById('newBookContent').value.trim();
+  const chapters = content ? [{ title:'第一章', content }] : [];
+  try {
+    const r = await fetch(`${API}/api/books`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title,author,chapters}) });
+    const d = await r.json();
+    hideModal('addBookModal');
+    document.getElementById('newBookTitle').value='';
+    document.getElementById('newBookAuthor').value='';
+    document.getElementById('newBookContent').value='';
+    toast(`「${title}」已创建`,'ok');
+    await loadBooks();
+    await selectBook(d.id);
+  } catch(e) { toast('创建失败','err'); }
 }
 
 async function addChapter() {
-    const title = document.getElementById('chapterTitle').value.trim() || `第${Date.now()%1000}章`;
-    const content = document.getElementById('chapterContent').value.trim();
-    if (!content) { showToast('请输入章节内容','warning'); return; }
-    try {
-        await fetch(`${API}/api/books/${currentBookId}/chapters`, {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ title, content })
-        });
-        hideModal('addChapterModal');
-        document.getElementById('chapterTitle').value = '';
-        document.getElementById('chapterContent').value = '';
-        showToast(`章节「${title}」已添加`, 'success');
-        await selectBook(currentBookId);
-    } catch(e) { showToast('添加失败','error'); }
+  if (!curBook) { toast('请先选择一本书','wn'); return; }
+  const title = document.getElementById('newChTitle').value.trim() || `第${Date.now()%10000}章`;
+  const content = document.getElementById('newChContent').value.trim();
+  if (!content) { toast('请输入内容','wn'); return; }
+  try {
+    await fetch(`${API}/api/books/${curBook}/chapters`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title,content}) });
+    hideModal('addChModal');
+    document.getElementById('newChTitle').value='';
+    document.getElementById('newChContent').value='';
+    toast(`「${title}」已添加`,'ok');
+    await selectBook(curBook);
+  } catch(e) { toast('添加失败','err'); }
 }
 
-async function deleteBook(bookId) {
-    if (!confirm('确定删除这本书？')) return;
-    try {
-        await fetch(`${API}/api/books/${bookId}`, { method: 'DELETE' });
-        if (currentBookId === bookId) { currentBookId = null; currentChapterId = null; }
-        showToast('已删除', 'success');
-        await loadBooks();
-        document.getElementById('bookList').innerHTML = '<div class="empty-hint"><span class="emoji">📚</span>点击「+ 新书」<br>添加你的小说</div>';
-        await loadBooks();
-    } catch(e) { showToast('删除失败','error'); }
+async function deleteBook(id) {
+  if (!confirm('确定删除？')) return;
+  try {
+    await fetch(`${API}/api/books/${id}`, {method:'DELETE'});
+    if (curBook===id) { curBook=null; curCh=null; }
+    toast('已删除','ok');
+    await loadBooks();
+  } catch(e) { toast('删除失败','err'); }
 }
 
-function toggleBookPanel() {
-    document.getElementById('bookPanel').classList.toggle('collapsed');
+function toggleLeft() { document.getElementById('panelL').classList.toggle('hide'); }
+
+// ====== 替换规则 ======
+function addRule(o='', r='') {
+  const c = document.getElementById('rulesBox');
+  const d = document.createElement('div');
+  d.className = 'rc';
+  d.innerHTML = `<input type="text" placeholder="原名" value="${esc(o)}" class="oi"><span class="ar">→</span><input type="text" placeholder="新名" value="${esc(r)}" class="ri" oninput="updateRuleStat()"><button class="dx" onclick="this.closest('.rc').remove();updateRuleStat()">×</button>`;
+  c.appendChild(d);
+  updateRuleStat();
 }
 
-// ============ 替换规则 ============
-function addRule(original='', replacement='') {
-    const c = document.getElementById('rulesContainer');
-    const card = document.createElement('div');
-    card.className = 'rule-card';
-    card.innerHTML = `<input type="text" placeholder="原名" value="${esc(original)}" class="orig-input"><span class="arrow">→</span><input type="text" placeholder="新名" value="${esc(replacement)}" class="repl-input"><button class="del-btn" onclick="removeRule(this)">×</button>`;
-    c.appendChild(card);
-    updateRuleCount();
-}
-function removeRule(btn) { btn.closest('.rule-card').remove(); updateRuleCount(); }
 function getRules() {
-    const rules = [];
-    document.querySelectorAll('.rule-card').forEach(c => {
-        const o = c.querySelector('.orig-input').value.trim();
-        const r = c.querySelector('.repl-input').value.trim();
-        if (o && r) rules.push({original:o, replacement:r});
-    });
-    return rules;
+  const rules = [];
+  document.querySelectorAll('.rc').forEach(c => {
+    const o = c.querySelector('.oi').value.trim();
+    const r = c.querySelector('.ri').value.trim();
+    if (o && r) rules.push({original:o, replacement:r});
+  });
+  return rules;
 }
-function updateRuleCount() { document.getElementById('ruleCount').textContent = getRules().length; }
+function updateRuleStat() { document.getElementById('sRules').textContent = getRules().length; }
 
-// ============ 智能提取 ============
-async function extractNames() {
-    const text = document.getElementById('originalText').value.trim();
-    if (!text) { showToast('请先输入原文','warning'); return; }
-    showLoading('正在智能提取...');
-    try {
-        const resp = await fetch(`${API}/api/extract`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text}) });
-        if (!resp.ok) throw new Error('提取失败');
-        const data = await resp.json();
-        displayExtractResults(data.names);
-    } catch(e) { showToast('提取失败: '+e.message,'error'); }
-    finally { hideLoading(); }
-}
+function toggleBatch() { document.getElementById('batchArea').classList.toggle('show'); }
 
-function displayExtractResults(names) {
-    const panel = document.getElementById('extractPanel');
-    const container = document.getElementById('extractResults');
-    container.innerHTML = '';
-    const cats = { person:{label:'👤 人物',tag:'tag-person'}, location:{label:'📍 地名',tag:'tag-location'}, organization:{label:'🏛️ 组织',tag:'tag-organization'} };
-    for (const [cat,info] of Object.entries(cats)) {
-        const items = names[cat]||[];
-        if (!items.length) continue;
-        const sec = document.createElement('div');
-        sec.style.marginBottom = '6px';
-        sec.innerHTML = `<span class="category-tag ${info.tag}">${info.label}</span>`;
-        items.forEach(name => {
-            const chip = document.createElement('span');
-            chip.className = 'name-chip'; chip.textContent = name;
-            chip.onclick = () => {
-                chip.classList.toggle('selected');
-                if (chip.classList.contains('selected')) {
-                    addRule(name, '');
-                    const cards = document.querySelectorAll('.rule-card');
-                    cards[cards.length-1]?.querySelector('.repl-input').focus();
-                }
-            };
-            sec.appendChild(chip);
-        });
-        container.appendChild(sec);
+function parseBatch() {
+  const txt = document.getElementById('batchInput').value.trim();
+  if (!txt) return;
+  const lines = txt.split('\n').filter(l => l.trim());
+  let count = 0;
+  lines.forEach(line => {
+    const parts = line.split(/[→=]/);
+    if (parts.length >= 2) {
+      const o = parts[0].trim(), r = parts.slice(1).join('→').trim();
+      if (o && r) { addRule(o, r); count++; }
     }
-    panel.classList.add('show');
+  });
+  document.getElementById('batchInput').value = '';
+  toast(`已添加 ${count} 条规则`,'ok');
 }
 
-// ============ 规则模板 ============
-async function loadRulesTemplates() {
-    try {
-        const resp = await fetch(`${API}/api/rules`);
-        const data = await resp.json();
-        renderTemplateList(data.rules);
-    } catch(e) {}
+// ====== 智能提取 ======
+async function extractNames() {
+  const text = document.getElementById('origText').value.trim();
+  if (!text) { toast('请先输入原文','wn'); return; }
+  showLd('正在提取名称...');
+  try {
+    const r = await fetch(`${API}/api/extract`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text}) });
+    if (!r.ok) throw new Error('提取失败');
+    const d = await r.json();
+    showExtractResults(d.names);
+  } catch(e) { toast('提取失败','err'); }
+  finally { hideLd(); }
 }
 
-function renderTemplateList(templates) {
-    const el = document.getElementById('templateList');
-    if (!templates.length) { el.innerHTML = '<div style="font-size:10px;color:var(--text3);">暂无模板</div>'; return; }
-    el.innerHTML = '';
-    templates.forEach(t => {
-        const div = document.createElement('div');
-        div.className = 'template-item';
-        div.innerHTML = `<span>${esc(t.name)} (${t.rules.length}条)</span><span class="book-del" onclick="event.stopPropagation();deleteTemplate('${t.id}')" title="删除">×</span>`;
-        div.onclick = () => applyTemplate(t.rules);
-        el.appendChild(div);
+function showExtractResults(names) {
+  const el = document.getElementById('extResults');
+  el.innerHTML = '';
+  const cats = [
+    {key:'person', label:'👤 人物', cls:'tag-p'},
+    {key:'location', label:'📍 地名', cls:'tag-l'},
+    {key:'organization', label:'🏛️ 组织', cls:'tag-o'}
+  ];
+  let hasAny = false;
+  cats.forEach(cat => {
+    const items = names[cat.key] || [];
+    if (!items.length) return;
+    hasAny = true;
+    const sec = document.createElement('div');
+    sec.style.marginBottom = '6px';
+    sec.innerHTML = `<span class="tag ${cat.cls}">${cat.label}</span> `;
+    items.forEach(name => {
+      const chip = document.createElement('span');
+      chip.className = 'nc'; chip.textContent = name;
+      chip.onclick = () => {
+        chip.classList.toggle('sel');
+        if (chip.classList.contains('sel')) {
+          addRule(name, '');
+          // 聚焦新规则的新名输入框
+          const cards = document.querySelectorAll('.rc');
+          const last = cards[cards.length - 1];
+          if (last) last.querySelector('.ri').focus();
+        }
+      };
+      sec.appendChild(chip);
     });
+    el.appendChild(sec);
+  });
+  if (!hasAny) { el.innerHTML = '<div style="font-size:11px;color:var(--tx3)">未提取到名称</div>'; }
+  document.getElementById('extPanel').classList.add('show');
 }
 
-function applyTemplate(rules) {
-    rules.forEach(r => addRule(r.original, r.replacement));
-    showToast(`已加载 ${rules.length} 条规则`, 'success');
+// ====== 模板 ======
+async function loadTemplates() {
+  try {
+    const r = await fetch(`${API}/api/rules`);
+    const d = await r.json();
+    renderTemplates(d.rules || []);
+  } catch(e) {}
 }
 
-function showSaveRulesModal() {
-    const rules = getRules();
-    if (!rules.length) { showToast('没有可保存的规则','warning'); return; }
-    showModal('saveRulesModal');
+function renderTemplates(tps) {
+  const el = document.getElementById('tpList');
+  if (!tps.length) { el.innerHTML = '<div style="font-size:10px;color:var(--tx3)">暂无模板</div>'; return; }
+  el.innerHTML = '';
+  tps.forEach(t => {
+    const d = document.createElement('div');
+    d.className = 'tp-item';
+    d.innerHTML = `<span>${esc(t.name)} (${t.rules.length}条)</span><span class="bx" style="opacity:1;font-size:12px" onclick="event.stopPropagation();delTemplate('${t.id}')">×</span>`;
+    d.onclick = () => { t.rules.forEach(r => addRule(r.original, r.replacement)); toast(`已加载 ${t.rules.length} 条规则`,'ok'); };
+    el.appendChild(d);
+  });
 }
 
-async function saveRulesTemplate() {
-    const name = document.getElementById('rulesTemplateName').value.trim();
-    if (!name) { showToast('请输入模板名','warning'); return; }
-    const rules = getRules();
-    try {
-        await fetch(`${API}/api/rules`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, rules}) });
-        hideModal('saveRulesModal');
-        document.getElementById('rulesTemplateName').value = '';
-        showToast('模板已保存', 'success');
-        await loadRulesTemplates();
-    } catch(e) { showToast('保存失败','error'); }
+async function saveTemplate() {
+  const name = document.getElementById('tpName').value.trim();
+  if (!name) { toast('请输入模板名','wn'); return; }
+  const rules = getRules();
+  if (!rules.length) { toast('没有可保存的规则','wn'); return; }
+  try {
+    await fetch(`${API}/api/rules`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name,rules}) });
+    hideModal('saveTpModal');
+    document.getElementById('tpName').value = '';
+    toast('模板已保存','ok');
+    await loadTemplates();
+  } catch(e) { toast('保存失败','err'); }
 }
 
-async function deleteTemplate(id) {
-    if (!confirm('删除此模板？')) return;
-    try {
-        await fetch(`${API}/api/rules/${id}`, { method:'DELETE' });
-        await loadRulesTemplates();
-    } catch(e) {}
+async function delTemplate(id) {
+  if (!confirm('删除此模板？')) return;
+  try { await fetch(`${API}/api/rules/${id}`,{method:'DELETE'}); await loadTemplates(); } catch(e) {}
 }
 
-// ============ 翻改 ============
-async function rewrite() {
-    const text = document.getElementById('originalText').value.trim();
-    if (!text) { showToast('请先输入原文','warning'); return; }
-    const rules = getRules();
-    if (!rules.length) { showToast('请添加替换规则','warning'); return; }
-    const useAi = document.getElementById('useAi').checked;
-    const intensity = document.getElementById('aiIntensity').value;
-    if (useAi && !apiKey) { showApiKeyModal(); return; }
-    showLoading(useAi ? 'AI改写中（30-60秒）...' : '正在翻改...');
-    try {
-        const resp = await fetch(`${API}/api/rewrite`, {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ text, rules, use_ai:useAi, ai_intensity:intensity, api_key:useAi?apiKey:null })
-        });
-        if (!resp.ok) throw new Error((await resp.json()).detail||'翻改失败');
-        const data = await resp.json();
-        document.getElementById('rewrittenText').textContent = data.rewritten;
-        let total = 0, hasWarning = false;
-        data.replacements.forEach(r => { if (r.original==='⚠️') { hasWarning=true; showToast(r.replacement,'warning'); } else total+=r.count; });
-        document.getElementById('replaceCount').textContent = total;
-        updateCounts();
-        if (!hasWarning) showToast(`翻改完成！${total}处替换`, 'success');
-    } catch(e) { showToast('翻改失败: '+e.message,'error'); }
-    finally { hideLoading(); }
+// ====== 翻改 ======
+async function doRewrite() {
+  const text = document.getElementById('origText').value.trim();
+  if (!text) { toast('请先输入原文','wn'); return; }
+  const rules = getRules();
+  if (!rules.length) { toast('请添加替换规则','wn'); return; }
+  const useAi = document.getElementById('useAi').checked;
+  const intensity = document.getElementById('aiLv').value;
+  if (useAi && !apiKey) { showModal('apiModal'); return; }
+
+  const btn = document.querySelector('.panel-m .btn-p:last-child');
+  btn.disabled = true;
+  showLd(useAi ? 'AI改写中（可能需要30-60秒）...' : '正在翻改...');
+
+  try {
+    const r = await fetch(`${API}/api/rewrite`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ text, rules, use_ai:useAi, ai_intensity:intensity, api_key:useAi?apiKey:null })
+    });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.detail||'翻改失败'); }
+    const d = await r.json();
+    lastRewriteData = d;
+    refreshResult();
+    let total = 0;
+    d.replacements.forEach(rp => { if (rp.original!=='⚠️') total += rp.count; });
+    document.getElementById('sReps').textContent = total;
+    document.getElementById('repInfo').textContent = `${total}处替换`;
+    updateCnt();
+    toast(`翻改完成！${total}处替换`,'ok');
+  } catch(e) { toast('翻改失败: '+e.message,'err'); }
+  finally { btn.disabled = false; hideLd(); }
 }
 
-// ============ AI选项 ============
-function toggleAiOptions() {
-    const on = document.getElementById('useAi').checked;
-    document.getElementById('aiSep').style.display = on?'':'none';
-    document.getElementById('aiIntensityLabel').style.display = on?'':'none';
-    document.getElementById('aiStatus').style.display = on?'':'none';
-    document.getElementById('aiStatus').querySelector('.stat-val').textContent = on?'开启':'关闭';
+function refreshResult() {
+  if (!lastRewriteData) return;
+  const el = document.getElementById('resultText');
+  const showDiff = document.getElementById('showDiff').checked;
+  el.textContent = lastRewriteData.rewritten;
+  if (showDiff && lastRewriteData.replacements) {
+    // 用 diff 高亮显示
+    let html = esc(lastRewriteData.rewritten);
+    lastRewriteData.replacements.forEach(rp => {
+      if (rp.original === '⚠️') return;
+      const oEsc = esc(rp.original);
+      const rEsc = esc(rp.replacement);
+      // 在改写文本中高亮新名
+      html = html.replace(rEsc, `<span class="diff-new">${rEsc}</span>`);
+    });
+    el.innerHTML = html;
+  }
+  updateCnt();
 }
 
-// ============ API Key ============
-function showApiKeyModal() { document.getElementById('apiKeyInput').value=apiKey; showModal('apiKeyModal'); }
-function saveApiKey() { apiKey=document.getElementById('apiKeyInput').value.trim(); localStorage.setItem('novel_rewriter_apikey',apiKey); hideModal('apiKeyModal'); showToast('API Key已保存','success'); }
+// ====== AI 选项 ======
+function toggleAi() {
+  const on = document.getElementById('useAi').checked;
+  document.getElementById('aiSep').style.display = on?'':'none';
+  document.getElementById('aiLbl').style.display = on?'':'none';
+  document.getElementById('sAi').style.display = on?'':'none';
+  // 显示差异高亮选项
+  document.getElementById('diffSep').style.display = on?'none':'none';
+  document.getElementById('diffLbl').style.display = on?'none':'none';
+}
 
-// ============ 工具 ============
-function updateCounts() {
-    const o = document.getElementById('originalText').value;
-    const r = document.getElementById('rewrittenText').textContent;
-    document.getElementById('origCount').textContent = o.length;
-    document.getElementById('rewritCount').textContent = r==='改写结果将在这里显示...'?0:r.length;
+// ====== API Key ======
+function saveApiKey() {
+  apiKey = document.getElementById('apiKeyIn').value.trim();
+  localStorage.setItem('nr_apikey', apiKey);
+  hideModal('apiModal');
+  toast('API Key 已保存','ok');
 }
-function clearAll() {
-    if (!confirm('确定清空？')) return;
-    document.getElementById('originalText').value = '';
-    document.getElementById('rewrittenText').textContent = '改写结果将在这里显示...';
-    document.getElementById('rulesContainer').innerHTML = '';
-    document.getElementById('extractPanel').classList.remove('show');
-    addRule(); updateCounts(); updateRuleCount();
-}
+
+// ====== 下载 ======
 function downloadResult() {
-    const t = document.getElementById('rewrittenText').textContent;
-    if (!t || t==='改写结果将在这里显示...') { showToast('没有可下载的内容','warning'); return; }
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([t],{type:'text/plain;charset=utf-8'}));
-    a.download = `翻改结果_${new Date().toISOString().slice(0,10)}.txt`;
-    a.click(); showToast('下载成功','success');
+  const t = document.getElementById('resultText').textContent;
+  if (!t || t==='等待翻改...') { toast('没有可下载的内容','wn'); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([t],{type:'text/plain;charset=utf-8'}));
+  a.download = `翻改结果_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+  toast('已下载','ok');
 }
+
+// ====== 计数 ======
+function updateCnt() {
+  const o = document.getElementById('origText').value;
+  const r = document.getElementById('resultText').textContent;
+  document.getElementById('cntO').textContent = o.length;
+  document.getElementById('cntR').textContent = (r==='等待翻改...') ? 0 : r.length;
+}
+
+// ====== 工具 ======
 function showModal(id) { document.getElementById(id).classList.add('show'); }
 function hideModal(id) { document.getElementById(id).classList.remove('show'); }
-function showLoading(t) { document.getElementById('loadingText').textContent=t; document.getElementById('loading').classList.add('show'); }
-function hideLoading() { document.getElementById('loading').classList.remove('show'); }
-function showToast(msg,type='success') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast toast-${type} show`; setTimeout(()=>t.classList.remove('show'),3000); }
+function showLd(t) { document.getElementById('ldText').textContent=t; document.getElementById('ldBg').classList.add('show'); }
+function hideLd() { document.getElementById('ldBg').classList.remove('show'); }
+function toast(msg,type='ok') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast toast-${type} show`; setTimeout(()=>t.classList.remove('show'),3000); }
 function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// ====== 键盘快捷键 ======
+document.addEventListener('keydown', e => {
+  // Ctrl+Enter 翻改
+  if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); doRewrite(); }
+  // Escape 关闭模态
+  if (e.key === 'Escape') { document.querySelectorAll('.modal-bg.show').forEach(m => m.classList.remove('show')); }
+});
 
 init();
 </script>
