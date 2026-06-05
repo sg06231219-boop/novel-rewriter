@@ -1,0 +1,8 @@
+build:
+  - command: pip install -r requirements.txt
+    environment:
+      PYTHON_VERSION: "3.12.11"
+run:
+  - command: python app.py
+    environment:
+      PORT: "10000"
