@@ -1091,6 +1091,9 @@ async def admin_page():
         return HTMLResponse(content=f.read())
 
 
+from starlette.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 8000))
