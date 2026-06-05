@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""小说翻改工具 v6.0 — 全方位优化版
+"""小说翻改工具 v6.1 — 交互体验升级版
 新功能：SSE流式AI翻改、章节拖拽排序、书库搜索API、
       对比模式切换、快捷键增强、PWA支持、Rate Limiting、
       多AI后端、物品名提取、CORS、文件导入、规则清空、
@@ -24,7 +24,7 @@ from collections import Counter
 from datetime import datetime
 # chardet removed - not needed
 
-app = FastAPI(title="小说翻改工具 v6.0")
+app = FastAPI(title="小说翻改工具 v6.1")
 
 ADMIN_PWD = os.environ.get("ADMIN_PASSWORD", "admin123")
 
@@ -1015,7 +1015,7 @@ _seed_books()
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "6.0"}
+    return {"status": "ok", "version": "6.1"}
 
 
 # ============ 管理员认证 ============
