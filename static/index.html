@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>小说翻改工具</title>
+<meta name="theme-color" content="#0a0a14">
+<title>小说翻改工具 v6.0</title>
+<link rel="manifest" href="/manifest.json">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
   --bg:#0a0a14;--sf:#12121e;--sf2:#1a1a2e;--sf3:#222240;--bd:#2a2a4a;
   --tx:#e0e0e0;--tx2:#999;--tx3:#555;
   --pm:#7c5cfc;--pm2:#5a3fd6;--pmbg:rgba(124,92,252,.1);
-  --ac:#ff6b9d;--ok:#4ecdc4;--wn:#ffe66d;--dg:#ff6b6b
-}
+  --ac:#ff6b9d;--ok:#4ecdc4;--wn:#ffe66d;--dg:#ff6b6b}
 .light{
   --bg:#f5f5fa;--sf:#fff;--sf2:#f0f0f5;--sf3:#e5e5ef;--bd:#d0d0da;
-  --tx:#1a1a2e;--tx2:#666;--tx3:#999
-}
+  --tx:#1a1a2e;--tx2:#666;--tx3:#999}
 body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;background:var(--bg);color:var(--tx);height:100vh;overflow:hidden;transition:background .3s,color .3s}
 .app{display:flex;flex-direction:column;height:100vh}
 
@@ -25,6 +25,11 @@ body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;background:var(--bg)
 .topbar .ver{font-size:.55em;padding:2px 6px;background:var(--pm);border-radius:10px;color:#fff}
 .topbar-right{margin-left:auto;display:flex;gap:4px;align-items:center}
 .topbar-right .btn{padding:5px 10px;font-size:11px}
+
+/* 对比模式切换 */
+.view-modes{display:flex;gap:2px;background:var(--sf3);border-radius:5px;padding:2px}
+.view-modes .vm{padding:3px 8px;border:none;background:none;color:var(--tx3);font-size:10px;cursor:pointer;border-radius:3px;transition:all .15s}
+.view-modes .vm.on{background:var(--pm);color:#fff}
 
 /* 通用按钮 */
 .btn{padding:6px 12px;border:none;border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s;font-weight:500;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
@@ -68,8 +73,14 @@ body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;background:var(--bg)
 .ch:hover{background:var(--sf3);color:var(--tx)}
 .ch.on{color:var(--pm);background:var(--pmbg)}
 .ch .ch-t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ch .ch-x{opacity:0;color:var(--dg);font-size:12px;margin-left:4px}
+.ch .ch-x{opacity:0;color:var(--dg);font-size:12px;margin-left:4px;cursor:pointer}
 .ch:hover .ch-x{opacity:1}
+
+/* 拖拽 */
+.ch[draggable=true]{cursor:grab}
+.ch.dragging{opacity:.4}
+.ch.drag-over{background:var(--pmbg);border-top:2px solid var(--pm)}
+
 .ch-add{padding:4px 8px 4px 32px;border-radius:3px;cursor:pointer;font-size:10px;color:var(--pm);text-align:center}
 
 /* 中栏 规则 */
@@ -132,6 +143,8 @@ textarea.ed:focus{outline:none}
 
 .sbar{background:var(--sf);border-top:1px solid var(--bd);padding:3px 10px;font-size:10px;color:var(--tx3);display:flex;gap:10px;flex-shrink:0}
 .sbar .v{color:var(--pm);font-weight:bold}
+.sbar label{cursor:pointer;display:flex;align-items:center;gap:3px}
+.sbar input[type=checkbox]{accent-color:var(--pm)}
 
 /* 模态 */
 .modal-bg{position:fixed;inset:0;background:rgba(10,10,20,.85);display:none;align-items:center;justify-content:center;z-index:999}
@@ -170,6 +183,13 @@ textarea.ed:focus{outline:none}
 .batch-area textarea:focus{outline:none;border-color:var(--pm)}
 .batch-area p{font-size:9px;color:var(--tx3);margin-top:3px}
 
+/* 搜索结果面板 */
+.search-panel{background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:8px;margin-bottom:6px;display:none}
+.search-panel.show{display:block}
+.search-panel h3{font-size:.7em;color:var(--tx2);margin-bottom:5px}
+.search-result-item{padding:3px 6px;border-radius:3px;cursor:pointer;font-size:10px;color:var(--tx2);margin-bottom:2px}
+.search-result-item:hover{background:var(--pmbg);color:var(--pm)}
+
 /* 移动端适配 */
 @media (max-width:900px){
   .panel-l{width:200px}
@@ -194,13 +214,18 @@ textarea.ed:focus{outline:none}
 <div class="app">
   <div class="topbar">
     <button class="btn btn-g btn-xs" onclick="togglePanel('panelL')" title="书库">📚</button>
-    <h1>📖 小说翻改</h1><span class="ver" id="verBadge">v4.1</span>
+    <h1>📖 小说翻改</h1><span class="ver" id="verBadge">v6.0</span>
+    <div class="view-modes">
+      <button class="vm on" onclick="setViewMode('both')" id="vmBoth">并排</button>
+      <button class="vm" onclick="setViewMode('orig')" id="vmOrig">原文</button>
+      <button class="vm" onclick="setViewMode('result')" id="vmResult">结果</button>
+    </div>
     <div class="topbar-right">
       <button class="btn btn-g btn-xs" onclick="toggleTheme()" id="themeBtn" title="主题">🌙</button>
       <button class="btn btn-g btn-xs" onclick="showModal('apiModal')" title="API设置">🔑</button>
       <button class="btn btn-g btn-xs" onclick="downloadResult()" title="下载">💾</button>
       <button class="btn btn-g btn-xs" onclick="importFile()" title="导入文件">📁</button>
-      <input type="file" id="fileInput" accept=".txt" style="display:none" onchange="handleFile(event)">
+      <input type="file" id="fileInput" accept=".txt,.md,.text" style="display:none" onchange="handleFile(event)">
     </div>
   </div>
 
@@ -208,7 +233,7 @@ textarea.ed:focus{outline:none}
     <!-- 左栏 书库 -->
     <div class="panel-l" id="panelL">
       <div class="ph"><h2>📚 书库</h2><button class="btn btn-p btn-xs" onclick="showModal('addBookModal')">+ 新书</button></div>
-      <div class="book-search"><input id="bookSearch" placeholder="搜索..." oninput="filterBooks()"></div>
+      <div class="book-search"><input id="bookSearch" placeholder="搜索书名/作者..." oninput="filterBooks()"></div>
       <div class="pb" id="bookList"></div>
     </div>
 
@@ -244,7 +269,7 @@ textarea.ed:focus{outline:none}
       </div>
       <div style="padding:6px;border-top:1px solid var(--bd)">
         <button class="btn btn-p" onclick="doRewrite()" id="rewriteBtn" style="width:100%;padding:8px;font-size:12px">🚀 开始翻改</button>
-        <button class="btn btn-a" onclick="rewriteBook()" id="rewriteBookBtn" style="width:100%;padding:8px;font-size:12px;margin-top:3px">📚 整本翻改</button>
+        <button class="btn btn-a" onclick="rewriteBookStream()" id="rewriteBookBtn" style="width:100%;padding:8px;font-size:12px;margin-top:3px">📚 整本翻改(流式)</button>
         <div id="bookRewriteProgress" style="display:none;margin-top:4px">
           <div style="background:var(--sf2);border-radius:4px;overflow:hidden;height:16px;position:relative">
             <div id="brProgress" style="background:linear-gradient(90deg,var(--pm),var(--ac));height:100%;width:0;transition:width .3s"></div>
@@ -271,11 +296,11 @@ textarea.ed:focus{outline:none}
         <div class="counter">原文 <span id="cntO">0</span> 字 → 改写 <span id="cntR">0</span> 字</div>
       </div>
       <div class="cmp" id="cmpContainer">
-        <div class="cmp-p">
+        <div class="cmp-p" id="cmpOrig">
           <div class="cmp-h"><div class="dot" style="background:var(--wn)"></div>原文 <button class="copy-btn" onclick="copyText('origText')">📋 复制</button></div>
           <div class="cmp-b" id="origScroll"><textarea class="ed" id="origText" placeholder="粘贴原文或从书库加载..." oninput="updateCnt();saveDraft()"></textarea></div>
         </div>
-        <div class="cmp-p">
+        <div class="cmp-p" id="cmpResult">
           <div class="cmp-h"><div class="dot" style="background:var(--ok)"></div>结果 <span id="repInfo" style="margin-left:auto;font-size:9px"></span> <button class="copy-btn" onclick="copyResult()">📋 复制</button></div>
           <div class="cmp-b" id="resultScroll"><div class="result" id="resultText">等待翻改...</div></div>
         </div>
@@ -284,6 +309,7 @@ textarea.ed:focus{outline:none}
         <div>规则: <span class="v" id="sRules">0</span></div>
         <div>替换: <span class="v" id="sReps">0</span></div>
         <div id="sAi" style="display:none">AI: <span class="v">开启</span></div>
+        <label style="margin-left:auto"><input type="checkbox" id="syncScrollCb" checked onchange="toggleSyncScroll()"> 同步滚动</label>
       </div>
     </div>
   </div>
@@ -355,11 +381,13 @@ let curBook = null, curCh = null, currentBookData = null;
 let allBooks = [];
 let lastRewriteData = null;
 let fontSize = 13;
-let extractedNames = {}; // 记录已添加的提取名称
-let syncScrollEnabled = true; // 同步滚动
-let bookRewriteResult = null; // 整本翻改结果
+let extractedNames = {};
+let syncScrollEnabled = true;
+let bookRewriteResult = null;
+let viewMode = 'both'; // 'both' | 'orig' | 'result'
+let isStreaming = false; // SSE流式标志
 
-// ====== 初始化 ======
+// ===== 初始化 =====
 async function init() {
   addRule();
   await loadBooks();
@@ -371,9 +399,38 @@ async function init() {
   loadApiKey();
   setupSyncScroll();
   fetchVersion();
+  registerSW();
 }
 
-// ====== 主题 ======
+// ===== PWA =====
+function registerSW() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  }
+}
+
+// ===== 对比模式切换 =====
+function setViewMode(mode) {
+  viewMode = mode;
+  document.querySelectorAll('.vm').forEach(b => b.classList.remove('on'));
+  document.getElementById('vmBoth').classList.toggle('on', mode==='both');
+  document.getElementById('vmOrig').classList.toggle('on', mode==='orig');
+  document.getElementById('vmResult').classList.toggle('on', mode==='result');
+  const cmpOrig = document.getElementById('cmpOrig');
+  const cmpResult = document.getElementById('cmpResult');
+  if (mode === 'both') {
+    cmpOrig.style.display = 'flex';
+    cmpResult.style.display = 'flex';
+  } else if (mode === 'orig') {
+    cmpOrig.style.display = 'flex';
+    cmpResult.style.display = 'none';
+  } else {
+    cmpOrig.style.display = 'none';
+    cmpResult.style.display = 'flex';
+  }
+}
+
+// ===== 主题 =====
 function loadTheme() {
   const t = localStorage.getItem('nr_theme') || 'dark';
   document.body.classList.toggle('light', t === 'light');
@@ -385,7 +442,7 @@ function toggleTheme() {
   document.getElementById('themeBtn').textContent = isLight ? '☀️' : '🌙';
 }
 
-// ====== 字体大小 ======
+// ===== 字体大小 =====
 function loadFontSize() {
   fontSize = parseInt(localStorage.getItem('nr_fontsize') || '13');
   applyFontSize();
@@ -401,7 +458,7 @@ function applyFontSize() {
   document.getElementById('fontSizeVal').textContent = fontSize + 'px';
 }
 
-// ====== 本地暂存 ======
+// ===== 本地暂存 =====
 function saveDraft() {
   localStorage.setItem('nr_draft', document.getElementById('origText').value);
 }
@@ -410,7 +467,7 @@ function loadDraft() {
   if (d) document.getElementById('origText').value = d;
 }
 
-// ====== 书库 ======
+// ===== 书库 =====
 async function loadBooks() {
   try {
     const r = await fetch(`${API}/api/books`);
@@ -425,14 +482,10 @@ function renderBookList() {
   const q = (document.getElementById('bookSearch')?.value || '').toLowerCase();
   const filtered = q ? allBooks.filter(b => b.title.toLowerCase().includes(q) || (b.author||'').toLowerCase().includes(q)) : allBooks;
   if (!filtered.length) { el.innerHTML = '<div class="empty"><span class="e">📚</span>暂无书籍</div>'; return; }
-  
-  // 先加载已展开书的详情再渲染
-  const expandedId = curBook;
-  const expandedData = currentBookData;
-  
+
   let html = '';
   filtered.forEach(b => {
-    const isExpanded = b.id === expandedId && expandedData;
+    const isExpanded = b.id === curBook && currentBookData;
     const on = b.id === curBook ? ' on' : '';
     const arrow = isExpanded ? '▼' : '▶';
     html += `<div class="bk${on}" onclick="selectBook('${b.id}')">
@@ -441,12 +494,16 @@ function renderBookList() {
       <div style="flex:1;min-width:0"><div class="bn">${esc(b.title)}</div><div class="bm">${b.author?esc(b.author)+' · ':''}${b.chapter_count}章</div></div>
       <span class="bx" onclick="event.stopPropagation();confirmDelete('book','${b.id}','「${esc(b.title)}」')">×</span>
     </div>`;
-    // 展开的书的章节直接渲染在书下面
     if (isExpanded) {
-      const chs = expandedData.chapters || [];
-      chs.forEach(ch => {
+      const chs = currentBookData.chapters || [];
+      chs.forEach((ch,i) => {
         const chOn = ch.id === curCh ? ' on' : '';
-        html += `<div class="ch${chOn}" onclick="loadChapterById('${b.id}','${ch.id}')">
+        html += `<div class="ch" draggable="true"
+          draggable="true"
+          ondragstart="dragStart(event,${i})"
+          ondragover="dragOver(event)"
+          ondragend="dragEnd(event)"
+          onclick="loadChapterById('${b.id}','${ch.id}')">
           <span class="ch-t">${esc(ch.title)}</span>
           <span class="ch-x" onclick="event.stopPropagation();confirmDelete('chapter','${ch.id}','「${esc(ch.title)}」')">×</span>
         </div>`;
@@ -457,14 +514,54 @@ function renderBookList() {
   el.innerHTML = html;
 }
 
+// 章节拖拽排序
+let dragIdx = null;
+function dragStart(e, idx) {
+  dragIdx = idx;
+  e.target.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function dragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+}
+function dragEnd(e) {
+  e.currentTarget.classList.remove('dragging','drag-over');
+  // 找出所有.ch元素，重新排序
+  if (dragIdx === null) return;
+  const chEls = document.querySelectorAll('.ch[draggable=true]');
+  const chIds = Array.from(chEls).map(el => {
+    // 从onclick中提取chapter id
+    const m = el.getAttribute('onclick').match(/'(ch_seed[^']+)'/);
+    return m ? m[1] : null;
+  }).filter(Boolean);
+  if (chIds.length > 1) {
+    reorderChapters(curBook, chIds);
+  }
+  dragIdx = null;
+}
+async function reorderChapters(bookId, chapterIds) {
+  try {
+    await fetch(`${API}/api/books/${bookId}/chapters/reorder`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chapter_ids:chapterIds})
+    });
+    toast('章节顺序已更新','ok');
+    // 刷新
+    const r = await fetch(`${API}/api/books/${bookId}`);
+    currentBookData = await r.json();
+    renderBookList();
+  } catch(e) { toast('排序失败','err'); }
+}
+
 function filterBooks() { renderBookList(); }
 
 async function selectBook(id) {
-  if (curBook === id) { 
-    // 再次点击折叠
-    curBook = null; curCh = null; currentBookData = null; 
-    renderBookList(); 
-    return; 
+  if (curBook === id) {
+    curBook = null; curCh = null; currentBookData = null;
+    renderBookList();
+    return;
   }
   curBook = id; curCh = null;
   try {
@@ -474,7 +571,6 @@ async function selectBook(id) {
   } catch(e) { toast('加载失败','err'); }
 }
 
-// 通过bookId+chId加载章节（从currentBookData查找）
 function loadChapterById(bookId, chId) {
   if (!currentBookData || currentBookData.id !== bookId) return;
   const ch = (currentBookData.chapters || []).find(c => c.id === chId);
@@ -482,63 +578,11 @@ function loadChapterById(bookId, chId) {
   curCh = chId;
   document.getElementById('origText').value = ch.content;
   updateCnt(); saveDraft();
-  // 更新高亮
-  document.querySelectorAll('.ch').forEach(e => e.classList.remove('on'));
-  event.currentTarget?.classList.add('on');
+  renderBookList();
   toast(`已加载「${ch.title}」`,'ok');
 }
 
-// 保留兼容
-function loadChapter(ch, el) {
-  curCh = ch.id;
-  document.getElementById('origText').value = ch.content;
-  updateCnt(); saveDraft();
-  document.querySelectorAll('.ch').forEach(e => e.classList.remove('on'));
-  if (el) el.classList.add('on');
-  toast(`已加载「${ch.title}」`,'ok');
-}
-
-async function createBook() {
-  const title = document.getElementById('newBookTitle').value.trim();
-  if (!title) { toast('请输入书名','wn'); return; }
-  const author = document.getElementById('newBookAuthor').value.trim();
-  const content = document.getElementById('newBookContent').value.trim();
-  const chapters = content ? [{ title:'第一章', content }] : [];
-  try {
-    const r = await fetch(`${API}/api/books`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title,author,chapters}) });
-    const d = await r.json();
-    hideModal('addBookModal');
-    document.getElementById('newBookTitle').value='';
-    document.getElementById('newBookAuthor').value='';
-    document.getElementById('newBookContent').value='';
-    toast(`「${title}」已创建`,'ok');
-    await loadBooks();
-    await selectBook(d.id);
-  } catch(e) { toast('创建失败','err'); }
-}
-
-async function addChapter() {
-  if (!curBook) { toast('请先选择一本书','wn'); return; }
-  const title = document.getElementById('newChTitle').value.trim() || `第${Date.now()%10000}章`;
-  const content = document.getElementById('newChContent').value.trim();
-  if (!content) { toast('请输入内容','wn'); return; }
-  try {
-    await fetch(`${API}/api/books/${curBook}/chapters`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title,content}) });
-    hideModal('addChModal');
-    document.getElementById('newChTitle').value='';
-    document.getElementById('newChContent').value='';
-    toast(`「${title}」已添加`,'ok');
-    // 重新加载书详情+书列表
-    const r = await fetch(`${API}/api/books/${curBook}`);
-    currentBookData = await r.json();
-    await loadBooks();
-    // 保持展开状态
-    curBook = currentBookData.id;
-    renderBookList();
-  } catch(e) { toast('添加失败','err'); }
-}
-
-// ====== 确认删除 ======
+// ===== 删除 =====
 let deleteTarget = null;
 function confirmDelete(type, id, name) {
   deleteTarget = { type, id };
@@ -560,7 +604,6 @@ async function executeDelete() {
       await fetch(`${API}/api/books/${curBook}/chapters/${id}`, {method:'DELETE'});
       if (curCh === id) curCh = null;
       toast('已删除','ok');
-      // 重新加载书详情
       const r = await fetch(`${API}/api/books/${curBook}`);
       currentBookData = await r.json();
       await loadBooks();
@@ -577,7 +620,7 @@ async function executeDelete() {
 
 function togglePanel(id) { document.getElementById(id).classList.toggle('hide'); }
 
-// ====== 替换规则 ======
+// ===== 替换规则 =====
 function addRule(o='', r='') {
   const c = document.getElementById('rulesBox');
   const d = document.createElement('div');
@@ -592,7 +635,6 @@ function clearRules() {
   updateRuleStat();
   toast('规则已清空','ok');
 }
-
 function getRules() {
   const rules = [];
   document.querySelectorAll('.rc').forEach(c => {
@@ -622,12 +664,12 @@ function parseBatch() {
   toast(`已添加 ${count} 条规则`,'ok');
 }
 
-// ====== 智能提取 ======
+// ===== 智能提取 =====
 async function extractNames() {
   const text = document.getElementById('origText').value.trim();
   if (!text) { toast('请先输入原文','wn'); return; }
   showLd('提取中...');
-  extractedNames = {}; // 重置
+  extractedNames = {};
   try {
     const r = await fetch(`${API}/api/extract`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text}) });
     if (!r.ok) throw new Error('提取失败');
@@ -642,7 +684,7 @@ function showExtractResults(names) {
   el.innerHTML = '';
   const cats = [
     {key:'person', label:'👤 人物', cls:'tag-p'},
-    {key:'location', label:'📍 地名', cls:'tag-l'},
+    {key:'location', label:'🗺️ 地名', cls:'tag-l'},
     {key:'organization', label:'🏛️ 组织', cls:'tag-o'},
     {key:'item', label:'⚔️ 物品', cls:'tag-i'}
   ];
@@ -673,12 +715,10 @@ function toggleExtractedName(chip, name) {
   if (isSelected) {
     addRule(name, '');
     extractedNames[name] = true;
-    // 聚焦新名输入框
     const cards = document.querySelectorAll('.rc');
     const last = cards[cards.length - 1];
     if (last) last.querySelector('.ri').focus();
   } else if (extractedNames[name]) {
-    // 取消选择，删除对应规则
     document.querySelectorAll('.rc').forEach(c => {
       const oi = c.querySelector('.oi');
       if (oi && oi.value === name) c.remove();
@@ -688,7 +728,7 @@ function toggleExtractedName(chip, name) {
   }
 }
 
-// ====== 模板 ======
+// ===== 模板 =====
 async function loadTemplates() {
   try {
     const r = await fetch(`${API}/api/rules`);
@@ -696,7 +736,6 @@ async function loadTemplates() {
     renderTemplates(d.rules || []);
   } catch(e) {}
 }
-
 function renderTemplates(tps) {
   const el = document.getElementById('tpList');
   if (!tps.length) { el.innerHTML = '<div style="font-size:9px;color:var(--tx3)">暂无模板</div>'; return; }
@@ -709,7 +748,6 @@ function renderTemplates(tps) {
     el.appendChild(d);
   });
 }
-
 async function saveTemplate() {
   const name = document.getElementById('tpName').value.trim();
   if (!name) { toast('请输入模板名','wn'); return; }
@@ -724,7 +762,75 @@ async function saveTemplate() {
   } catch(e) { toast('保存失败','err'); }
 }
 
-// ====== 翻改 ======
+// ===== AI 选项 =====
+function toggleAi() {
+  const on = document.getElementById('useAi').checked;
+  document.getElementById('aiSep').style.display = on?'':'none';
+  document.getElementById('aiPrvLbl').style.display = on?'':'none';
+  document.getElementById('aiLvLbl').style.display = on?'':'none';
+  document.getElementById('sAi').style.display = on?'':'none';
+}
+
+// ===== API Key =====
+function loadApiKey() {
+  const provider = document.getElementById('apiKeyProvider').value;
+  const key = localStorage.getItem('nr_apikey_' + provider) || '';
+  document.getElementById('apiKeyIn').value = key;
+}
+function saveApiKey() {
+  const provider = document.getElementById('apiKeyProvider').value;
+  const key = document.getElementById('apiKeyIn').value.trim();
+  localStorage.setItem('nr_apikey_' + provider, key);
+  hideModal('apiModal');
+  toast('API Key 已保存','ok');
+}
+
+// ===== 文件导入 =====
+function importFile() {
+  document.getElementById('fileInput').click();
+}
+function handleFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('origText').value = e.target.result;
+    updateCnt();
+    saveDraft();
+    toast(`已导入 ${file.name}`,'ok');
+  };
+  reader.readAsText(file, 'UTF-8');
+  event.target.value = '';
+}
+
+// ===== 下载 =====
+function downloadResult() {
+  const t = document.getElementById('resultText').textContent;
+  if (!t || t==='等待翻改...') { toast('没有可下载的内容','wn'); return; }
+  let content = t;
+  if (bookRewriteResult && bookRewriteResult.chapters && bookRewriteResult.chapters.length > 1) {
+    content = `《${bookRewriteResult.book_title}》翻改结果\n${'='.repeat(40)}\n\n`;
+    bookRewriteResult.chapters.forEach(ch => {
+      content += `${ch.title}\n${'-'.repeat(30)}\n${ch.rewritten}\n\n`;
+    });
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content],{type:'text/plain;charset=utf-8'}));
+  const bookName = bookRewriteResult ? `_${bookRewriteResult.book_title}` : '';
+  a.download = `${bookName}翻改结果_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+  toast('已下载','ok');
+}
+
+// ===== 计数 =====
+function updateCnt() {
+  const o = document.getElementById('origText').value;
+  const r = document.getElementById('resultText').textContent;
+  document.getElementById('cntO').textContent = o.length;
+  document.getElementById('cntR').textContent = (r==='等待翻改...') ? 0 : r.length;
+}
+
+// ===== 翻改（非流式）=====
 async function doRewrite() {
   const text = document.getElementById('origText').value.trim();
   if (!text) { toast('请先输入原文','wn'); return; }
@@ -733,14 +839,12 @@ async function doRewrite() {
   const useAi = document.getElementById('useAi').checked;
   const intensity = document.getElementById('aiLv').value;
   const provider = document.getElementById('aiProvider').value;
-  
   const apiKey = localStorage.getItem('nr_apikey_' + provider) || '';
   if (useAi && !apiKey) { showModal('apiModal'); return; }
 
   const btn = document.getElementById('rewriteBtn');
   btn.disabled = true;
   showLd(useAi ? 'AI改写中（可能需要30-60秒）...' : '翻改中...');
-
   try {
     const r = await fetch(`${API}/api/rewrite`, {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -763,12 +867,10 @@ async function doRewrite() {
 function renderResult(data) {
   const el = document.getElementById('resultText');
   let html = esc(data.rewritten);
-  // 高亮所有替换的新名
   if (data.replacements) {
     data.replacements.forEach(rp => {
       if (rp.original === '⚠️') return;
       const rEsc = esc(rp.replacement);
-      // 全局替换所有出现
       html = html.split(rEsc).join(`<span class="diff-new">${rEsc}</span>`);
     });
   }
@@ -776,145 +878,8 @@ function renderResult(data) {
   applyFontSize();
 }
 
-// ====== AI 选项 ======
-function toggleAi() {
-  const on = document.getElementById('useAi').checked;
-  document.getElementById('aiSep').style.display = on?'':'none';
-  document.getElementById('aiPrvLbl').style.display = on?'':'none';
-  document.getElementById('aiLvLbl').style.display = on?'':'none';
-  document.getElementById('sAi').style.display = on?'':'none';
-}
-
-// ====== API Key ======
-function loadApiKey() {
-  const provider = document.getElementById('apiKeyProvider').value;
-  const key = localStorage.getItem('nr_apikey_' + provider) || '';
-  document.getElementById('apiKeyIn').value = key;
-}
-function saveApiKey() {
-  const provider = document.getElementById('apiKeyProvider').value;
-  const key = document.getElementById('apiKeyIn').value.trim();
-  localStorage.setItem('nr_apikey_' + provider, key);
-  hideModal('apiModal');
-  toast('API Key 已保存','ok');
-}
-
-// ====== 文件导入 ======
-function importFile() {
-  document.getElementById('fileInput').click();
-}
-function handleFile(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    document.getElementById('origText').value = e.target.result;
-    updateCnt();
-    saveDraft();
-    toast(`已导入 ${file.name}`,'ok');
-  };
-  reader.readAsText(file, 'UTF-8');
-  event.target.value = '';
-}
-
-// ====== 下载 ======
-function downloadResult() {
-  const t = document.getElementById('resultText').textContent;
-  if (!t || t==='等待翻改...') { toast('没有可下载的内容','wn'); return; }
-  let content = t;
-  // 如果是整本翻改结果，格式化输出
-  if (bookRewriteResult && bookRewriteResult.chapters && bookRewriteResult.chapters.length > 1) {
-    content = `《${bookRewriteResult.book_title}》翻改结果\n${'='.repeat(40)}\n\n`;
-    bookRewriteResult.chapters.forEach(ch => {
-      content += `${ch.title}\n${'-'.repeat(30)}\n${ch.rewritten}\n\n`;
-    });
-  }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([content],{type:'text/plain;charset=utf-8'}));
-  const bookName = bookRewriteResult ? `_${bookRewriteResult.book_title}` : '';
-  a.download = `${bookName}翻改结果_${new Date().toISOString().slice(0,10)}.txt`;
-  a.click();
-  toast('已下载','ok');
-}
-
-// ====== 计数 ======
-function updateCnt() {
-  const o = document.getElementById('origText').value;
-  const r = document.getElementById('resultText').textContent;
-  document.getElementById('cntO').textContent = o.length;
-  document.getElementById('cntR').textContent = (r==='等待翻改...') ? 0 : r.length;
-}
-
-// ====== 工具 ======
-function showModal(id) { document.getElementById(id).classList.add('show'); }
-function hideModal(id) { document.getElementById(id).classList.remove('show'); }
-function showLd(t) { document.getElementById('ldText').textContent=t; document.getElementById('ldBg').classList.add('show'); }
-function hideLd() { document.getElementById('ldBg').classList.remove('show'); }
-function toast(msg,type='ok') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast toast-${type} show`; setTimeout(()=>t.classList.remove('show'),2500); }
-function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
-
-// ====== 版本号 ======
-async function fetchVersion() {
-  try {
-    const r = await fetch(`${API}/api/health`);
-    const d = await r.json();
-    document.getElementById('verBadge').textContent = d.version || '';
-  } catch(e) {}
-}
-
-// ====== 复制功能 ======
-function copyText(id) {
-  const el = document.getElementById(id);
-  const text = el.value || el.textContent;
-  navigator.clipboard.writeText(text).then(() => toast('已复制','ok')).catch(() => {
-    // fallback
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    toast('已复制','ok');
-  });
-}
-function copyResult() {
-  const text = document.getElementById('resultText').textContent;
-  if (!text || text === '等待翻改...') { toast('没有可复制的内容','wn'); return; }
-  navigator.clipboard.writeText(text).then(() => toast('已复制','ok')).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    toast('已复制','ok');
-  });
-}
-
-// ====== 同步滚动 ======
-function setupSyncScroll() {
-  const origS = document.getElementById('origScroll');
-  const resultS = document.getElementById('resultScroll');
-  if (!origS || !resultS) return;
-  let syncing = false;
-  origS.addEventListener('scroll', () => {
-    if (syncing || !syncScrollEnabled) return;
-    syncing = true;
-    const ratio = origS.scrollTop / (origS.scrollHeight - origS.clientHeight || 1);
-    resultS.scrollTop = ratio * (resultS.scrollHeight - resultS.clientHeight);
-    requestAnimationFrame(() => syncing = false);
-  });
-  resultS.addEventListener('scroll', () => {
-    if (syncing || !syncScrollEnabled) return;
-    syncing = true;
-    const ratio = resultS.scrollTop / (resultS.scrollHeight - resultS.clientHeight || 1);
-    origS.scrollTop = ratio * (origS.scrollHeight - origS.clientHeight);
-    requestAnimationFrame(() => syncing = false);
-  });
-}
-
-// ====== 整本翻改 ======
-async function rewriteBook() {
+// ===== 整本翻改（SSE流式）=====
+async function rewriteBookStream() {
   if (!curBook || !currentBookData) {
     toast('请先选择一本书','wn'); return;
   }
@@ -926,67 +891,114 @@ async function rewriteBook() {
   const apiKey = useAi ? (localStorage.getItem('nr_apikey_' + provider) || '') : '';
   if (useAi && !apiKey) { showModal('apiModal'); return; }
 
-  const totalCh = (currentBookData.chapters || []).length;
-  const doAi = useAi && apiKey;
-  const msg = doAi
-    ? `将对「${currentBookData.title}」全部 ${totalCh} 章进行AI+规则翻改，可能需要 ${totalCh}×30秒，确认？`
-    : `将对「${currentBookData.title}」全部 ${totalCh} 章进行规则翻改，确认？`;
-  if (!confirm(msg)) return;
+  const chapters = currentBookData.chapters || [];
+  if (!chapters.length) { toast('该书没有章节','wn'); return; }
 
   const btn = document.getElementById('rewriteBookBtn');
   btn.disabled = true;
   const progEl = document.getElementById('bookRewriteProgress');
   progEl.style.display = 'block';
+  bookRewriteResult = { book_id: curBook, book_title: currentBookData.title, total_chapters: 0, total_replacements: 0, chapters: [] };
 
-  if (!doAi) {
-    // 纯规则翻改，一次API调用
-    showLd('整本翻改中...');
+  // 清空结果区，准备流式输出
+  const resultEl = document.getElementById('resultText');
+  resultEl.innerHTML = '<div style="color:var(--tx3);font-size:11px;">📡 流式翻改中，请稍候...</div>';
+
+  let completedChapters = 0;
+
+  for (let i = 0; i < chapters.length; i++) {
+    const ch = chapters[i];
+    const pct = Math.round(((i + 1) / chapters.length) * 100);
+    document.getElementById('brProgress').style.width = pct + '%';
+    document.getElementById('brProgressText').textContent = `第${i+1}/${chapters.length}章 ${pct}%`;
+    document.getElementById('brStatus').textContent = `正在翻改: ${ch.title}`;
+
     try {
-      const r = await fetch(`${API}/api/books/${curBook}/rewrite`, {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ rules, use_ai: false, api_key: null, ai_provider: provider })
-      });
-      if (!r.ok) { const e = await r.json(); throw new Error(e.detail || '翻改失败'); }
-      bookRewriteResult = await r.json();
-      showBookRewriteResult(bookRewriteResult);
-      toast(`整本翻改完成！${bookRewriteResult.total_replacements}处替换`,'ok');
-    } catch(e) { toast('翻改失败: '+e.message,'err'); }
-    finally { btn.disabled = false; progEl.style.display = 'none'; hideLd(); }
-  } else {
-    // AI翻改，逐章调用（避免超时）
-    bookRewriteResult = { book_id: curBook, book_title: currentBookData.title, total_chapters: 0, total_replacements: 0, chapters: [] };
-    let totalReps = 0;
-    const chapters = currentBookData.chapters || [];
-    for (let i = 0; i < chapters.length; i++) {
-      const ch = chapters[i];
-      const pct = Math.round(((i + 1) / chapters.length) * 100);
-      document.getElementById('brProgress').style.width = pct + '%';
-      document.getElementById('brProgressText').textContent = pct + '%';
-      document.getElementById('brStatus').textContent = `正在翻改: ${ch.title} (${i+1}/${chapters.length})`;
-      try {
+      if (!useAi) {
+        // 纯规则翻改，直接调用
         const r = await fetch(`${API}/api/books/${curBook}/rewrite`, {
           method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ rules, use_ai: true, ai_intensity: intensity, api_key: apiKey, ai_provider: provider, chapter_ids: [ch.id] })
+          body: JSON.stringify({ rules, use_ai: false, api_key: null, ai_provider: provider, chapter_ids: [ch.id] })
         });
-        if (!r.ok) continue;
-        const d = await r.json();
-        if (d.chapters && d.chapters[0]) {
-          bookRewriteResult.chapters.push(d.chapters[0]);
-          totalReps += d.chapters[0].replace_count;
+        if (r.ok) {
+          const d = await r.json();
+          if (d.chapters && d.chapters[0]) {
+            bookRewriteResult.chapters.push(d.chapters[0]);
+            bookRewriteResult.total_replacements += d.chapters[0].replace_count;
+          }
         }
-      } catch(e) { /* skip failed chapter */ }
-    }
-    bookRewriteResult.total_chapters = bookRewriteResult.chapters.length;
-    bookRewriteResult.total_replacements = totalReps;
-    showBookRewriteResult(bookRewriteResult);
-    btn.disabled = false;
-    progEl.style.display = 'none';
-    toast(`整本翻改完成！${totalReps}处替换`,'ok');
+      } else {
+        // AI流式翻改，逐章SSE
+        await streamRewriteChapter(ch, rules, intensity, apiKey, provider);
+      }
+    } catch(e) { /* skip */ }
+
+    completedChapters++;
   }
+
+  bookRewriteResult.total_chapters = bookRewriteResult.chapters.length;
+  showBookRewriteResult(bookRewriteResult);
+  btn.disabled = false;
+  progEl.style.display = 'none';
+  toast(`整本翻改完成！${bookRewriteResult.total_replacements}处替换`,'ok');
+}
+
+// SSE流式翻改单章
+function streamRewriteChapter(ch, rules, intensity, apiKey, provider) {
+  return new Promise(async (resolve) => {
+    try {
+      const body = JSON.stringify({
+        text: ch.content, rules, use_ai: true, ai_intensity: intensity,
+        api_key: apiKey, ai_provider: provider
+      });
+      const r = await fetch(`${API}/api/rewrite/stream`, {
+        method:'POST', headers:{'Content-Type':'application/json'}, body
+      });
+      if (!r.ok) { resolve(); return; }
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // 保留不完整行
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const dataStr = line.slice(6);
+          if (dataStr === '[DONE]') continue;
+          try {
+            const data = JSON.parse(dataStr);
+            if (data.type === 'chunk') {
+              fullText += data.content;
+              // 实时更新结果区（显示当前章节）
+              document.getElementById('resultText').innerHTML = `<div style="font-size:11px;color:var(--pm)">正在翻改：${esc(ch.title)}</div><div style="margin-top:8px">${esc(fullText)}</div>`;
+            } else if (data.type === 'done') {
+              // 应用规则替换
+              let rewritten = data.rewritten || fullText;
+              let repDetails = data.replacements || [];
+              let total = 0;
+              repDetails.forEach(rp => { if (rp.original !== '⚠️') total += rp.count; });
+              bookRewriteResult.chapters.push({
+                id: ch.id, title: ch.title,
+                original: ch.content, rewritten, replacements: repDetails, replace_count: total
+              });
+              bookRewriteResult.total_replacements += total;
+            } else if (data.type === 'error') {
+              console.error('SSE error:', data.msg);
+            }
+          } catch(e) {}
+        }
+      }
+    } catch(e) { console.error(e); }
+    resolve();
+  });
 }
 
 function showBookRewriteResult(data) {
-  // 在结果区显示整本书翻改结果
   const el = document.getElementById('resultText');
   let html = '';
   (data.chapters || []).forEach(ch => {
@@ -1008,12 +1020,119 @@ function showBookRewriteResult(data) {
   document.getElementById('cntR').textContent = el.textContent.length;
 }
 
-// ====== 键盘快捷键 ======
+// ===== 同步滚动 =====
+function setupSyncScroll() {
+  const origS = document.getElementById('origScroll');
+  const resultS = document.getElementById('resultScroll');
+  if (!origS || !resultS) return;
+  let syncing = false;
+  origS.addEventListener('scroll', () => {
+    if (syncing || !syncScrollEnabled) return;
+    syncing = true;
+    const ratio = origS.scrollTop / (origS.scrollHeight - origS.clientHeight || 1);
+    resultS.scrollTop = ratio * (resultS.scrollHeight - resultS.clientHeight);
+    requestAnimationFrame(() => syncing = false);
+  });
+  resultS.addEventListener('scroll', () => {
+    if (syncing || !syncScrollEnabled) return;
+    syncing = true;
+    const ratio = resultS.scrollTop / (resultS.scrollHeight - resultS.clientHeight || 1);
+    origS.scrollTop = ratio * (origS.scrollHeight - origS.clientHeight);
+    requestAnimationFrame(() => syncing = false);
+  });
+}
+function toggleSyncScroll() {
+  syncScrollEnabled = document.getElementById('syncScrollCb').checked;
+}
+
+// ===== 工具函数 =====
+function showModal(id) { document.getElementById(id).classList.add('show'); }
+function hideModal(id) { document.getElementById(id).classList.remove('show'); }
+function showLd(t) { document.getElementById('ldText').textContent=t; document.getElementById('ldBg').classList.add('show'); }
+function hideLd() { document.getElementById('ldBg').classList.remove('show'); }
+function toast(msg,type='ok') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast toast-${type} show`; setTimeout(()=>t.classList.remove('show'),2500); }
+function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// ===== 版本号 =====
+async function fetchVersion() {
+  try {
+    const r = await fetch(`${API}/api/health`);
+    const d = await r.json();
+    document.getElementById('verBadge').textContent = d.version || '6.0';
+  } catch(e) {}
+}
+
+// ===== 复制功能 =====
+function copyText(id) {
+  const el = document.getElementById(id);
+  const text = el.value || el.textContent;
+  navigator.clipboard.writeText(text).then(() => toast('已复制','ok')).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('已复制','ok');
+  });
+}
+function copyResult() {
+  const text = document.getElementById('resultText').textContent;
+  if (!text || text === '等待翻改...') { toast('没有可复制的内容','wn'); return; }
+  navigator.clipboard.writeText(text).then(() => toast('已复制','ok')).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('已复制','ok');
+  });
+}
+
+// ===== 创建书籍 =====
+async function createBook() {
+  const title = document.getElementById('newBookTitle').value.trim();
+  if (!title) { toast('请输入书名','wn'); return; }
+  const author = document.getElementById('newBookAuthor').value.trim();
+  const content = document.getElementById('newBookContent').value.trim();
+  const chapters = content ? [{ title:'第一章', content }] : [];
+  try {
+    const r = await fetch(`${API}/api/books`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title,author,chapters}) });
+    const d = await r.json();
+    hideModal('addBookModal');
+    document.getElementById('newBookTitle').value='';
+    document.getElementById('newBookAuthor').value='';
+    document.getElementById('newBookContent').value='';
+    toast(`「${title}」已创建`,'ok');
+    await loadBooks();
+    await selectBook(d.id);
+  } catch(e) { toast('创建失败','err'); }
+}
+
+// ===== 添加章节 =====
+async function addChapter() {
+  if (!curBook) { toast('请先选择一本书','wn'); return; }
+  const title = document.getElementById('newChTitle').value.trim() || `第${Date.now()%10000}章`;
+  const content = document.getElementById('newChContent').value.trim();
+  if (!content) { toast('请输入内容','wn'); return; }
+  try {
+    await fetch(`${API}/api/books/${curBook}/chapters`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title,content}) });
+    hideModal('addChModal');
+    document.getElementById('newChTitle').value='';
+    document.getElementById('newChContent').value='';
+    toast(`「${title}」已添加`,'ok');
+    const r = await fetch(`${API}/api/books/${curBook}`);
+    currentBookData = await r.json();
+    await loadBooks();
+    curBook = currentBookData.id;
+    renderBookList();
+  } catch(e) { toast('添加失败','err'); }
+}
+
+// ===== 键盘快捷键 =====
 document.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); doRewrite(); }
   if (e.key === 'Escape') { document.querySelectorAll('.modal-bg.show').forEach(m => m.classList.remove('show')); }
+  // Ctrl+S 保存草稿
+  if (e.ctrlKey && e.key === 's') { e.preventDefault(); saveDraft(); toast('草稿已保存','ok'); }
 });
-
 init();
 </script>
 </body>
