@@ -623,15 +623,22 @@ async def add_chapter(book_id: str, req: ChapterAdd):
     raise HTTPException(status_code=404, detail="书籍不存在")
 
 
+class ChapterUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+
+
 @app.put("/api/books/{book_id}/chapters/{ch_id}")
-async def update_chapter(book_id: str, ch_id: str, req: ChapterAdd):
+async def update_chapter(book_id: str, ch_id: str, req: ChapterUpdate):
     books = _load_json(BOOKS_FILE, [])
     for b in books:
         if b["id"] == book_id:
             for ch in b.get("chapters", []):
                 if ch["id"] == ch_id:
-                    ch["title"] = req.title
-                    ch["content"] = req.content
+                    if req.title is not None:
+                        ch["title"] = req.title
+                    if req.content is not None:
+                        ch["content"] = req.content
                     b["updated_at"] = datetime.now().isoformat()[:19]
                     _save_json(BOOKS_FILE, books)
                     return {"ok": True}
@@ -1015,7 +1022,7 @@ _seed_books()
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "6.1"}
+    return {"status": "ok", "version": "6.2"}
 
 
 # ============ 管理员认证 ============
