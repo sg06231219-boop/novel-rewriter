@@ -908,3 +908,36 @@ document.addEventListener('keydown', e => {
   }
 });
 init();
+
+// ============ Event Delegation ============
+document.addEventListener("click", function(e) {
+  var el = e.target.closest("[data-action]");
+  if (!el) return;
+  var action = el.dataset.action;
+  var args = el.dataset.args || "";
+  switch(action) {
+    case "addChapter": addChapter(); break;
+    case "addRule": addRule(); break;
+    case "applyResultToChapter": applyResultToChapter(); break;
+    case "changeFontSize": changeFontSize(args); break;
+    case "clearRules": clearRules(); break;
+    case "copyResult": copyResult(); break;
+    case "copyText": copyText(args); break;
+    case "createBook": createBook(); break;
+    case "doRewrite": doRewrite(); break;
+    case "downloadResult": downloadResult(); break;
+    case "extractNames": extractNames(); break;
+    case "hideModal": hideModal(args); break;
+    case "importFile": importFile(); break;
+    case "parseBatch": parseBatch(); break;
+    case "rewriteBookStream": rewriteBookStream(); break;
+    case "saveApiKey": saveApiKey(); break;
+    case "saveChapterContent": saveChapterContent(); break;
+    case "saveTemplate": saveTemplate(); break;
+    case "setViewMode": setViewMode(args); break;
+    case "showModal": showModal(args); break;
+    case "toggleBatch": toggleBatch(); break;
+    case "togglePanel": togglePanel(args); break;
+    case "toggleTheme": toggleTheme(); break;
+  }
+});
