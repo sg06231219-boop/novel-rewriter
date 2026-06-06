@@ -17,18 +17,18 @@
 <body>
 <div class="app">
   <div class="topbar">
-    <button class="btn btn-g btn-xs" onclick="togglePanel('panelL')" title="书库">📚</button>
+    <button class="btn btn-g btn-xs" data-action="togglePanel" data-args="'panelL'" title="书库">📚</button>
     <h1>📖 小说翻改</h1><span class="ver" id="verBadge">...</span>
     <div class="view-modes">
-      <button class="vm on" onclick="setViewMode('both')" id="vmBoth">并排</button>
-      <button class="vm" onclick="setViewMode('orig')" id="vmOrig">原文</button>
-      <button class="vm" onclick="setViewMode('result')" id="vmResult">结果</button>
+      <button class="vm on" data-action="setViewMode" data-args="'both'" id="vmBoth">并排</button>
+      <button class="vm" data-action="setViewMode" data-args="'orig'" id="vmOrig">原文</button>
+      <button class="vm" data-action="setViewMode" data-args="'result'" id="vmResult">结果</button>
     </div>
     <div class="topbar-right">
-      <button class="btn btn-g btn-xs" onclick="toggleTheme()" id="themeBtn" title="主题">🌙</button>
-      <button class="btn btn-g btn-xs" onclick="showModal('apiModal')" title="API设置">🔑</button>
-      <button class="btn btn-g btn-xs" onclick="downloadResult()" title="下载">💾</button>
-      <button class="btn btn-g btn-xs" onclick="importFile()" title="导入文件">📁</button>
+      <button class="btn btn-g btn-xs" data-action="toggleTheme" id="themeBtn" title="主题">🌙</button>
+      <button class="btn btn-g btn-xs" data-action="showModal" data-args="'apiModal'" title="API设置">🔑</button>
+      <button class="btn btn-g btn-xs" data-action="downloadResult" title="下载">💾</button>
+      <button class="btn btn-g btn-xs" data-action="importFile" title="导入文件">📁</button>
       <input type="file" id="fileInput" accept=".txt,.md,.text" style="display:none" onchange="handleFile(event)">
     </div>
   </div>
@@ -36,7 +36,7 @@
   <div class="main">
     <!-- 左栏 书库 -->
     <div class="panel-l" id="panelL">
-      <div class="ph"><h2>📚 书库</h2><button class="btn btn-p btn-xs" onclick="showModal('addBookModal')">+ 新书</button></div>
+      <div class="ph"><h2>📚 书库</h2><button class="btn btn-p btn-xs" data-action="showModal" data-args="'addBookModal'">+ 新书</button></div>
       <div class="book-search">
         <input id="bookSearch" placeholder="搜索书名/作者..." oninput="handleSearch()">
         <select id="searchScope" onchange="handleSearch()">
@@ -52,21 +52,21 @@
       <div class="ph">
         <h2>🔄 替换规则</h2>
         <div style="display:flex;gap:2px">
-          <button class="btn btn-g btn-xs" onclick="toggleBatch()" title="批量">📝</button>
-          <button class="btn btn-g btn-xs" onclick="showModal('saveTpModal')" title="模板">💾</button>
-          <button class="btn btn-g btn-xs" onclick="clearRules()" title="清空">🗑️</button>
-          <button class="btn btn-p btn-xs" onclick="addRule()">+</button>
+          <button class="btn btn-g btn-xs" data-action="toggleBatch" title="批量">📝</button>
+          <button class="btn btn-g btn-xs" data-action="showModal" data-args="'saveTpModal'" title="模板">💾</button>
+          <button class="btn btn-g btn-xs" data-action="clearRules" title="清空">🗑️</button>
+          <button class="btn btn-p btn-xs" data-action="addRule">+</button>
         </div>
       </div>
       <div class="pb">
         <div class="batch-area" id="batchArea">
           <textarea id="batchInput" placeholder="每行一条：原名→新名&#10;萧炎→林焱&#10;药老→魂老"></textarea>
           <p>用 → 或 = 分隔</p>
-          <button class="btn btn-p btn-sm" onclick="parseBatch()" style="width:100%;margin-top:3px">批量添加</button>
+          <button class="btn btn-p btn-sm" data-action="parseBatch" style="width:100%;margin-top:3px">批量添加</button>
         </div>
         <div id="rulesBox"></div>
         <div style="margin-top:6px">
-          <button class="btn btn-a btn-sm" onclick="extractNames()" style="width:100%">🧠 智能提取名称</button>
+          <button class="btn btn-a btn-sm" data-action="extractNames" style="width:100%">🧠 智能提取名称</button>
         </div>
         <div class="ep" id="extPanel">
           <h3>提取结果（点击添加）</h3>
@@ -78,8 +78,8 @@
         </div>
       </div>
       <div style="padding:6px;border-top:1px solid var(--bd)">
-        <button class="btn btn-p" onclick="doRewrite()" id="rewriteBtn" style="width:100%;padding:8px;font-size:12px">🚀 开始翻改</button>
-        <button class="btn btn-a" onclick="rewriteBookStream()" id="rewriteBookBtn" style="width:100%;padding:8px;font-size:12px;margin-top:3px">📚 整本翻改(流式)</button>
+        <button class="btn btn-p" data-action="doRewrite" id="rewriteBtn" style="width:100%;padding:8px;font-size:12px">🚀 开始翻改</button>
+        <button class="btn btn-a" data-action="rewriteBookStream" id="rewriteBookBtn" style="width:100%;padding:8px;font-size:12px;margin-top:3px">📚 整本翻改(流式)</button>
         <div id="bookRewriteProgress" style="display:none;margin-top:4px">
           <div style="background:var(--sf2);border-radius:4px;overflow:hidden;height:16px;position:relative">
             <div id="brProgress" style="background:linear-gradient(90deg,var(--pm),var(--ac));height:100%;width:0;transition:width .3s"></div>
@@ -99,9 +99,9 @@
         <label id="aiLvLbl" style="display:none">强度 <select id="aiLv"><option value="light">轻微</option><option value="medium" selected>中等</option><option value="heavy">大幅</option></select></label>
         <div class="sep"></div>
         <div class="font-ctrl">
-          <button class="font-btn" onclick="changeFontSize(-1)" title="减小字体">−</button>
+          <button class="font-btn" data-action="changeFontSize" data-args="-1" title="减小字体">−</button>
           <span id="fontSizeVal" style="font-size:10px;color:var(--tx2);min-width:28px;text-align:center">13px</span>
-          <button class="font-btn" onclick="changeFontSize(1)" title="增大字体">+</button>
+          <button class="font-btn" data-action="changeFontSize" data-args="1" title="增大字体">+</button>
         </div>
         <div class="counter">原文 <span id="cntO">0</span> 字 → 改写 <span id="cntR">0</span> 字</div>
       </div>
@@ -110,8 +110,8 @@
           <div class="cmp-h">
             <div class="dot" style="background:var(--wn)"></div>
             <span id="origTitle">原文</span>
-            <button class="cmp-btn copy-btn" onclick="copyText('origText')">📋 复制</button>
-            <button class="cmp-btn save-ch-btn" id="saveChBtn" onclick="saveChapterContent()" style="display:none;right:60px" title="保存到章节">💾 保存</button>
+            <button class="cmp-btn copy-btn" data-action="copyText" data-args="'origText'">📋 复制</button>
+            <button class="cmp-btn save-ch-btn" id="saveChBtn" data-action="saveChapterContent" style="display:none;right:60px" title="保存到章节">💾 保存</button>
           </div>
           <div class="cmp-b" id="origScroll"><textarea class="ed" id="origText" placeholder="粘贴原文或从书库加载..." oninput="updateCnt();saveDraft()"></textarea></div>
         </div>
@@ -119,8 +119,8 @@
           <div class="cmp-h">
             <div class="dot" style="background:var(--ok)"></div>
             <span id="repInfo">结果</span>
-            <button class="cmp-btn apply-btn ok" id="applyBtn" onclick="applyResultToChapter()" style="display:none" title="应用到章节">✅ 应用</button>
-            <button class="cmp-btn copy-btn" onclick="copyResult()">📋 复制</button>
+            <button class="cmp-btn apply-btn ok" id="applyBtn" data-action="applyResultToChapter" style="display:none" title="应用到章节">✅ 应用</button>
+            <button class="cmp-btn copy-btn" data-action="copyResult">📋 复制</button>
           </div>
           <div class="cmp-b" id="resultScroll"><div class="result" id="resultText">等待翻改...</div></div>
         </div>
@@ -149,7 +149,7 @@
       <option value="openai">OpenAI API Key</option>
     </select>
     <input type="text" id="apiKeyIn" placeholder="输入 API Key">
-    <div class="modal-act"><button class="btn btn-g" onclick="hideModal('apiModal')">取消</button><button class="btn btn-p" onclick="saveApiKey()">保存</button></div>
+    <div class="modal-act"><button class="btn btn-g" data-action="hideModal" data-args="'apiModal'">取消</button><button class="btn btn-p" data-action="saveApiKey">保存</button></div>
   </div>
 </div>
 
@@ -160,7 +160,7 @@
     <input type="text" id="newBookTitle" placeholder="书名">
     <input type="text" id="newBookAuthor" placeholder="作者（选填）">
     <textarea id="newBookContent" placeholder="第一章内容（选填）"></textarea>
-    <div class="modal-act"><button class="btn btn-g" onclick="hideModal('addBookModal')">取消</button><button class="btn btn-p" onclick="createBook()">创建</button></div>
+    <div class="modal-act"><button class="btn btn-g" data-action="hideModal" data-args="'addBookModal'">取消</button><button class="btn btn-p" data-action="createBook">创建</button></div>
   </div>
 </div>
 
@@ -170,7 +170,7 @@
     <h2>📝 添加章节</h2>
     <input type="text" id="newChTitle" placeholder="章节标题">
     <textarea id="newChContent" placeholder="章节内容"></textarea>
-    <div class="modal-act"><button class="btn btn-g" onclick="hideModal('addChModal')">取消</button><button class="btn btn-p" onclick="addChapter()">添加</button></div>
+    <div class="modal-act"><button class="btn btn-g" data-action="hideModal" data-args="'addChModal'">取消</button><button class="btn btn-p" data-action="addChapter">添加</button></div>
   </div>
 </div>
 
@@ -179,7 +179,7 @@
   <div class="modal">
     <h2>💾 保存模板</h2>
     <input type="text" id="tpName" placeholder="模板名称">
-    <div class="modal-act"><button class="btn btn-g" onclick="hideModal('saveTpModal')">取消</button><button class="btn btn-p" onclick="saveTemplate()">保存</button></div>
+    <div class="modal-act"><button class="btn btn-g" data-action="hideModal" data-args="'saveTpModal'">取消</button><button class="btn btn-p" data-action="saveTemplate">保存</button></div>
   </div>
 </div>
 
@@ -188,7 +188,7 @@
   <div class="modal">
     <h2>⚠️ 确认删除</h2>
     <p id="confirmText">确定要删除吗？</p>
-    <div class="modal-act"><button class="btn btn-g" onclick="hideModal('confirmModal')">取消</button><button class="btn btn-d" id="confirmBtn">删除</button></div>
+    <div class="modal-act"><button class="btn btn-g" data-action="hideModal" data-args="'confirmModal'">取消</button><button class="btn btn-d" id="confirmBtn">删除</button></div>
   </div>
 </div>
 
