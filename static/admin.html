@@ -81,7 +81,7 @@ tr:hover td{background:var(--sf2)}
 <div class="login-wrap" id="loginWrap">
   <div class="login-box">
     <h1>📖 管理后台</h1>
-    <p>小说翻改工具 v6.2</p>
+    <p>小说翻改工具 v6.2.1</p>
     <input type="password" id="pwdInput" placeholder="管理员密码" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="btn btn-p" onclick="doLogin()">登录</button>
   </div>
@@ -153,6 +153,18 @@ tr:hover td{background:var(--sf2)}
   </div>
 </div>
 
+<!-- 确认模态框 -->
+<div style="position:fixed;inset:0;background:rgba(10,10,20,.85);display:none;align-items:center;justify-content:center;z-index:999" id="confirmModal">
+  <div style="background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:16px;width:360px;max-width:90vw">
+    <h2 style="font-size:1em;margin-bottom:10px;color:var(--dg)">⚠️ 确认操作</h2>
+    <p id="confirmText" style="font-size:13px;color:var(--tx2);margin-bottom:14px"></p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-g" onclick="closeConfirmModal()">取消</button>
+      <button class="btn btn-d" id="confirmOk">确认</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API = '';
 let token = localStorage.getItem('nr_admin_token') || '';
@@ -193,7 +205,7 @@ async function refreshData() {
   showLd();
   try {
     const [stats, books, rules] = await Promise.all([
-      fetch(`${API}/api/admin/stats?token=${token}`).then(r => r.json()),
+      fetch(`${API}/api/admin/stats`, {headers:{'Authorization':`Bearer ${token}`}}).then(r => r.json()),
       fetch(`${API}/api/books`).then(r => r.json()),
       fetch(`${API}/api/rules`).then(r => r.json())
     ]);
@@ -277,31 +289,35 @@ function renderRules() {
 
 // ====== 操作 ======
 async function deleteBook(id) {
-  if (!confirm('确定删除此书？')) return;
-  await fetch(`${API}/api/books/${id}`, {method:'DELETE'});
-  toast('已删除','ok'); refreshData();
+  showConfirm('确定删除此书？此操作不可撤销。', async () => {
+    await fetch(`${API}/api/books/${id}`, {method:'DELETE'});
+    toast('已删除','ok'); refreshData();
+  });
 }
 async function deleteChapter(bookId, chId) {
-  if (!confirm('确定删除此章节？')) return;
-  await fetch(`${API}/api/books/${bookId}/chapters/${chId}`, {method:'DELETE'});
-  toast('已删除','ok'); refreshData();
+  showConfirm('确定删除此章节？', async () => {
+    await fetch(`${API}/api/books/${bookId}/chapters/${chId}`, {method:'DELETE'});
+    toast('已删除','ok'); refreshData();
+  });
 }
 async function deleteRule(id) {
-  if (!confirm('确定删除此模板？')) return;
-  await fetch(`${API}/api/rules/${id}`, {method:'DELETE'});
-  toast('已删除','ok'); refreshData();
+  showConfirm('确定删除此模板？', async () => {
+    await fetch(`${API}/api/rules/${id}`, {method:'DELETE'});
+    toast('已删除','ok'); refreshData();
+  });
 }
 
 async function reseedData() {
-  if (!confirm('重置种子数据将清除所有书籍，恢复为初始31本。确定？')) return;
-  showLd();
-  try {
-    const r = await fetch(`${API}/api/admin/seed?token=${token}`, {method:'POST'});
-    const d = await r.json();
-    toast(`已重置，${d.book_count}本书`,'ok');
-    refreshData();
-  } catch(e) { toast('重置失败','err'); }
-  finally { hideLd(); }
+  showConfirm('重置种子数据将清除所有书籍，恢复为初始31本。确定？', async () => {
+    showLd();
+    try {
+      const r = await fetch(`${API}/api/admin/seed`, {method:'POST', headers:{'Authorization':`Bearer ${token}`}});
+      const d = await r.json();
+      toast(`已重置，${d.book_count}本书`,'ok');
+      refreshData();
+    } catch(e) { toast('重置失败','err'); }
+    finally { hideLd(); }
+  });
 }
 
 // ====== 编辑模态框 ======
@@ -398,20 +414,39 @@ async function editChapter(bookId, chId) {
         body: JSON.stringify({title: newTitle, content: newContent})
       });
       toast('已更新','ok');
-      const el = document.getElementById(`chcontent_${bookId}`);
-      if (el) el.textContent = '加载中...';
-      toggleBookDetail(bookId);
-      toggleBookDetail(bookId);
-      toggleBookDetail(bookId);
+      // 重新加载该书详情
+      const row = document.getElementById(`brow_${bookId}`);
+      const isExpanded = row && row.classList.contains('expanded');
+      if (isExpanded) {
+        // 先关闭再重新打开，让数据刷新
+        toggleBookDetail(bookId);
+        setTimeout(() => toggleBookDetail(bookId), 100);
+      }
     });
   } catch(e) { toast('编辑失败','err'); }
 }
+
+// ====== 确认模态框 ======
+let confirmCallback = null;
+function showConfirm(text, callback) {
+  document.getElementById('confirmText').textContent = text;
+  confirmCallback = callback;
+  document.getElementById('confirmModal').style.display = 'flex';
+}
+function closeConfirmModal() {
+  document.getElementById('confirmModal').style.display = 'none';
+  confirmCallback = null;
+}
+document.getElementById('confirmOk').onclick = function() {
+  if (confirmCallback) confirmCallback();
+  closeConfirmModal();
+};
 
 // ====== 工具 ======
 function toast(msg,type='ok') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast toast-${type} show`; setTimeout(()=>t.classList.remove('show'),2500); }
 function showLd() { document.getElementById('ldBg').classList.add('show'); }
 function hideLd() { document.getElementById('ldBg').classList.remove('show'); }
-function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // 自动登录
 if (token) { showAdmin(); }
