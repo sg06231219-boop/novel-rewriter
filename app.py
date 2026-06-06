@@ -24,7 +24,7 @@ from collections import Counter
 from datetime import datetime
 # chardet removed - not needed
 
-app = FastAPI(title="小说翻改工具 v6.1")
+app = FastAPI(title="Novel Rewriter v6.2.1")
 
 ADMIN_PWD = os.environ.get("ADMIN_PASSWORD", "admin123")
 
@@ -32,11 +32,17 @@ ADMIN_PWD = os.environ.get("ADMIN_PASSWORD", "admin123")
 _rate_limit_store: Dict[str, list] = {}
 RATE_LIMIT_WINDOW = 60  # 1分钟窗口
 RATE_LIMIT_MAX = 30     # 每窗口最大请求数
+RATE_LIMIT_CLEANUP_INTERVAL = 300  # 每5分钟清理过期记录
 
 
 def _check_rate_limit(client_ip: str):
     """滑动窗口速率限制"""
     now = time.time()
+    # 定期清理所有过期 IP 记录，防止内存泄漏
+    if len(_rate_limit_store) > 1000:
+        stale = [ip for ip, ts in _rate_limit_store.items() if not ts or now - ts[-1] > RATE_LIMIT_WINDOW]
+        for ip in stale:
+            del _rate_limit_store[ip]
     if client_ip not in _rate_limit_store:
         _rate_limit_store[client_ip] = []
     # 清理过期记录
@@ -446,13 +452,16 @@ async def rewrite_stream(req: RewriteRequest, request: Request):
 # ============ 搜索 API ============
 
 @app.get("/api/books/search")
-async def search_books(q: str = "", scope: str = "title"):
-    """搜索书库，scope: title(书名)/content(内容)"""
+async def search_books(q: str = "", scope: str = "title", limit: int = 20, offset: int = 0):
+    """搜索书库，scope: title(书名)/content(内容)，支持分页"""
     if not q:
-        return {"results": []}
+        return {"results": [], "total": 0}
+    limit = min(limit, 50)  # 最多50条
     books = _load_json(BOOKS_FILE, [])
     results = []
     for b in books:
+        if len(results) >= limit + offset:
+            break
         if scope == "title":
             if q.lower() in b["title"].lower() or q.lower() in b.get("author", "").lower():
                 results.append({
@@ -471,8 +480,10 @@ async def search_books(q: str = "", scope: str = "title"):
                     matched_chapters.append({
                         "id": ch["id"],
                         "title": ch["title"],
-                        "snippet": snippet.replace(q, f"【{q}】"),
+                        "snippet": snippet.replace(q, f"\u3010{q}\u3011"),
                     })
+                    if len(matched_chapters) >= 5:  # 每书最多5条匹配章节
+                        break
             if matched_chapters:
                 results.append({
                     "id": b["id"],
@@ -480,7 +491,8 @@ async def search_books(q: str = "", scope: str = "title"):
                     "author": b.get("author", ""),
                     "matched_chapters": matched_chapters,
                 })
-    return {"results": results, "total": len(results)}
+    total = len(results)
+    return {"results": results[offset:offset + limit], "total": total}
 
 
 # ============ 章节排序 API ============
@@ -546,11 +558,10 @@ async def export_books(book_id: str = None, format: str = "txt"):
 @app.post("/api/import")
 async def import_file(data: dict):
     """从上传的文本内容导入（由前端读取文件后发来）"""
-    try:
-        content = data.get("content", "")
-        return {"content": content[:500000]}  # 限制50万字符
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    content = data.get("content", "")
+    if not content:
+        raise HTTPException(status_code=400, detail="内容不能为空")
+    return {"content": content[:500000], "length": len(content)}  # 限制50万字符
 
 
 # ============ 书库 API ============
@@ -1022,7 +1033,7 @@ _seed_books()
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "6.2"}
+    return {"status": "ok", "version": "6.2.1"}
 
 
 # ============ 管理员认证 ============
@@ -1043,8 +1054,11 @@ async def admin_login(req: AdminLogin):
 
 
 @app.get("/api/admin/stats")
-async def admin_stats(token: str = ""):
-    if token != ADMIN_PWD:
+async def admin_stats(request: Request, token: str = ""):
+    """管理员统计，支持 header 和 query param 鉴权"""
+    auth = request.headers.get('Authorization', '')
+    effective_token = auth.replace('Bearer ', '') if auth.startswith('Bearer ') else token
+    if effective_token != ADMIN_PWD:
         raise HTTPException(status_code=401, detail="未授权")
     books = _load_json(BOOKS_FILE, [])
     rules = _load_json(RULES_FILE, [])
@@ -1062,8 +1076,11 @@ async def admin_stats(token: str = ""):
 
 
 @app.post("/api/admin/seed")
-async def admin_reseed(token: str = ""):
-    if token != ADMIN_PWD:
+async def admin_reseed(request: Request, token: str = ""):
+    """重置种子数据，支持 header 和 query param 鉴权"""
+    auth = request.headers.get('Authorization', '')
+    effective_token = auth.replace('Bearer ', '') if auth.startswith('Bearer ') else token
+    if effective_token != ADMIN_PWD:
         raise HTTPException(status_code=401, detail="未授权")
     _save_json(BOOKS_FILE, [])
     _seed_books()
@@ -1072,8 +1089,10 @@ async def admin_reseed(token: str = ""):
 
 
 @app.put("/api/admin/books/{book_id}/chapters/batch")
-async def batch_add_chapters(book_id: str, data: dict, token: str = ""):
-    if token != ADMIN_PWD:
+async def batch_add_chapters(book_id: str, data: dict, request: Request, token: str = ""):
+    auth = request.headers.get('Authorization', '')
+    effective_token = auth.replace('Bearer ', '') if auth.startswith('Bearer ') else token
+    if effective_token != ADMIN_PWD:
         raise HTTPException(status_code=401, detail="未授权")
     books = _load_json(BOOKS_FILE, [])
     for b in books:
