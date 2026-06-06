@@ -10,7 +10,7 @@
 <meta property="og:description" content="AI驱动的小说文本改写平台，支持名称替换、句式改写、对照预览">
 <meta property="og:image" content="https://novel-rewriter.onrender.com/static/og-image.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
-<title>小说翻改工具 v6.2</title>
+<title>小说翻改工具 v6.2.1</title>
 <link rel="manifest" href="/static/manifest.json">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -180,7 +180,7 @@ textarea.ed:focus{outline:none}
 <div class="app">
   <div class="topbar">
     <button class="btn btn-g btn-xs" onclick="togglePanel('panelL')" title="书库">📚</button>
-    <h1>📖 小说翻改</h1><span class="ver" id="verBadge">v6.1</span>
+    <h1>📖 小说翻改</h1><span class="ver" id="verBadge">...</span>
     <div class="view-modes">
       <button class="vm on" onclick="setViewMode('both')" id="vmBoth">并排</button>
       <button class="vm" onclick="setViewMode('orig')" id="vmOrig">原文</button>
@@ -984,7 +984,7 @@ function renderResult(data) {
   const el = document.getElementById('resultText');
   let html = esc(data.rewritten);
   if (data.replacements) {
-    // 按替换词长度降序排列，避免短词先匹配导致长词被截断
+    // 按替换词(新名)长度降序排列，避免短词先匹配截断长词
     const sorted = data.replacements.filter(rp => rp.original !== '⚠️').sort((a,b) => b.replacement.length - a.replacement.length);
     const highlighted = new Set();
     sorted.forEach(rp => {
@@ -1132,10 +1132,14 @@ function showBookRewriteResult(data) {
       <div style="font-size:11px;color:var(--pm);font-weight:bold;margin-bottom:4px">${esc(ch.title)} <span style="color:var(--tx3);font-weight:normal">(${ch.replace_count}处替换)</span></div>`;
     let chHtml = esc(ch.rewritten);
     if (ch.replacements) {
-      ch.replacements.forEach(rp => {
-        if (rp.original === '⚠️') return;
+      const sorted = ch.replacements.filter(rp => rp.original !== '⚠️').sort((a,b) => b.replacement.length - a.replacement.length);
+      const highlighted = new Set();
+      sorted.forEach(rp => {
         const rEsc = esc(rp.replacement);
-        chHtml = chHtml.split(rEsc).join(`<span class="diff-new">${rEsc}</span>`);
+        if (!highlighted.has(rEsc)) {
+          chHtml = chHtml.split(rEsc).join(`<span class="diff-new">${rEsc}</span>`);
+          highlighted.add(rEsc);
+        }
       });
     }
     html += `<div style="font-size:13px;line-height:1.9;white-space:pre-wrap;word-break:break-all">${chHtml}</div></div>`;
@@ -1177,7 +1181,7 @@ function hideModal(id) { document.getElementById(id).classList.remove('show'); }
 function showLd(t) { document.getElementById('ldText').textContent=t; document.getElementById('ldBg').classList.add('show'); }
 function hideLd() { document.getElementById('ldBg').classList.remove('show'); }
 function toast(msg,type='ok') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast toast-${type} show`; setTimeout(()=>t.classList.remove('show'),2500); }
-function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ===== 版本号 =====
 async function fetchVersion() {
