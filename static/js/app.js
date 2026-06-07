@@ -114,11 +114,11 @@ function renderBookList() {
     const isExpanded = b.id === curBook && currentBookData;
     const on = b.id === curBook ? ' on' : '';
     const arrow = isExpanded ? '▼' : '▶';
-    html += `<div class="bk${on}" onclick="selectBook('${b.id}')">
+    html += `<div class="bk${on}" onclick="selectBook('${escJs(b.id)}')">`,
       <span class="bi" style="font-size:8px">${arrow}</span>
       <span class="bi">📖</span>
       <div style="flex:1;min-width:0"><div class="bn">${esc(b.title)}</div><div class="bm">${b.author?esc(b.author)+' · ':''}${b.chapter_count}章</div></div>
-      <span class="bx" onclick="event.stopPropagation();confirmDelete('book','${b.id}','「${esc(b.title)}」')">×</span>
+      <span class="bx" onclick="event.stopPropagation();confirmDelete('book','${escJs(b.id)}','「${escJs(b.title)}」')">×</span>
     </div>`;
     if (isExpanded) {
       const chs = currentBookData.chapters || [];
@@ -131,9 +131,9 @@ function renderBookList() {
           ondragleave="dragLeave(event)"
           ondrop="dropChapter(event,${i})"
           ondragend="dragEnd(event)"
-          onclick="loadChapterById('${b.id}','${ch.id}')">
+          onclick="loadChapterById('${escJs(b.id)}','${escJs(ch.id)}')">
           <span class="ch-t">${esc(ch.title)}</span>
-          <span class="ch-x" onclick="event.stopPropagation();confirmDelete('chapter','${ch.id}','「${esc(ch.title)}」')">×</span>
+          <span class="ch-x" onclick="event.stopPropagation();confirmDelete('chapter','${escJs(ch.id)}','「${escJs(ch.title)}」')">×</span>
         </div>`;
       });
       html += `<div class="ch-add" onclick="event.stopPropagation();showModal('addChModal')">+ 添加章节</div>`;
@@ -167,13 +167,13 @@ function renderSearchResults(results, q) {
   if (!results.length) { el.innerHTML = '<div class="empty"><span class="e">🔍</span>未找到匹配内容</div>'; return; }
   let html = '<div style="padding:4px 8px;font-size:9px;color:var(--wn);margin-bottom:4px;cursor:pointer" onclick="loadBooks();handleSearch()">📖 内容搜索结果 · 点击返回书库</div>';
   results.forEach(b => {
-    html += `<div class="bk" onclick="curBook=null;currentBookData=null;selectBook('${b.id}')">
+    html += `<div class="bk" onclick="curBook=null;currentBookData=null;selectBook('${escJs(b.id)}')">
       <span class="bi">📖</span>
       <div style="flex:1;min-width:0"><div class="bn">${esc(b.title)}</div><div class="bm">${b.author?esc(b.author)+' · ':''}${b.chapter_count||0}章</div></div>
     </div>`;
     if (b.matched_chapters && b.matched_chapters.length) {
       b.matched_chapters.slice(0, 3).forEach(ch => {
-        html += `<div class="ch" onclick="event.stopPropagation();curBook=null;currentBookData=null;selectBookAndChapter('${b.id}','${ch.id}')" style="background:var(--sf2)">
+        html += `<div class="ch" onclick="event.stopPropagation();curBook=null;currentBookData=null;selectBookAndChapter('${escJs(b.id)}','${escJs(ch.id)}')" style="background:var(--sf2)">
           <span class="ch-t">${esc(ch.title)}</span>
           <span style="font-size:9px;color:var(--wn);margin-left:4px">命中</span>
         </div>
@@ -495,7 +495,7 @@ function renderTemplates(tps) {
   tps.forEach(t => {
     const d = document.createElement('div');
     d.className = 'tp-item';
-    d.innerHTML = `<span>${esc(t.name)} (${t.rules.length})</span><span class="bx" style="opacity:1;font-size:11px" onclick="event.stopPropagation();confirmDelete('template','${t.id}','「${esc(t.name)}」模板')">×</span>`;
+    d.innerHTML = `<span>${esc(t.name)} (${t.rules.length})</span><span class="bx" style="opacity:1;font-size:11px" onclick="event.stopPropagation();confirmDelete('template','${escJs(t.id)}','「${escJs(t.name)}」模板')">×</span>`;
     d.onclick = () => { t.rules.forEach(r => addRule(r.original, r.replacement)); toast(`已加载 ${t.rules.length} 条规则`,'ok'); };
     el.appendChild(d);
   });
@@ -822,7 +822,8 @@ function hideModal(id) { document.getElementById(id).classList.remove('show'); }
 function showLd(t) { document.getElementById('ldText').textContent=t; document.getElementById('ldBg').classList.add('show'); }
 function hideLd() { document.getElementById('ldBg').classList.remove('show'); }
 function toast(msg,type='ok') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast toast-${type} show`; setTimeout(()=>t.classList.remove('show'),2500); }
-function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function escJs(s) { if (!s) return ''; return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,'\\n').replace(/\r/g,'\\r'); }
 
 // ===== 版本号 =====
 async function fetchVersion() {
@@ -919,7 +920,7 @@ document.addEventListener("click", function(e) {
     case "addChapter": addChapter(); break;
     case "addRule": addRule(); break;
     case "applyResultToChapter": applyResultToChapter(); break;
-    case "changeFontSize": changeFontSize(args); break;
+    case "changeFontSize": changeFontSize(parseInt(args)); break;
     case "clearRules": clearRules(); break;
     case "copyResult": copyResult(); break;
     case "copyText": copyText(args); break;
