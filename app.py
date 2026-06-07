@@ -28,6 +28,12 @@ app = FastAPI(title="Novel Rewriter v6.2.1")
 
 ADMIN_PWD = os.environ.get("ADMIN_PASSWORD", "admin123")
 
+
+def _get_admin_token(request: Request, query_token: str = "") -> str:
+    """从 header 或 query param 获取管理员 token"""
+    auth = request.headers.get('Authorization', '')
+    return auth.replace('Bearer ', '') if auth.startswith('Bearer ') else query_token
+
 # ============ Rate Limiting ============
 _rate_limit_store: Dict[str, list] = {}
 RATE_LIMIT_WINDOW = 60  # 1分钟窗口
@@ -395,8 +401,7 @@ async def rewrite_text(req: RewriteRequest, request: Request):
 
 
 @app.post("/api/extract")
-async def extract_names(req: ExtractRequest, request: Request):
-    _check_rate_limit(request.client.host if request.client else "0.0.0.0")
+async def extract_names(req: ExtractRequest):
     try:
         return {"names": extract_names_rule_based(req.text)}
     except Exception as e:
@@ -561,7 +566,8 @@ async def import_file(data: dict):
     content = data.get("content", "")
     if not content:
         raise HTTPException(status_code=400, detail="内容不能为空")
-    return {"content": content[:500000], "length": len(content)}  # 限制50万字符
+    truncated = len(content) > 500000
+    return {"content": content[:500000], "length": len(content), "truncated": truncated}
 
 
 # ============ 书库 API ============
@@ -615,6 +621,26 @@ async def delete_book(book_id: str):
     books = [b for b in books if b["id"] != book_id]
     _save_json(BOOKS_FILE, books)
     return {"ok": True}
+
+
+class BookUpdate(BaseModel):
+    title: Optional[str] = None
+    author: Optional[str] = None
+
+
+@app.put("/api/books/{book_id}")
+async def update_book(book_id: str, req: BookUpdate):
+    books = _load_json(BOOKS_FILE, [])
+    for b in books:
+        if b["id"] == book_id:
+            if req.title is not None:
+                b["title"] = req.title
+            if req.author is not None:
+                b["author"] = req.author
+            b["updated_at"] = datetime.now().isoformat()[:19]
+            _save_json(BOOKS_FILE, books)
+            return {"ok": True}
+    raise HTTPException(status_code=404, detail="书籍不存在")
 
 
 @app.post("/api/books/{book_id}/chapters")
@@ -1033,7 +1059,7 @@ _seed_books()
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "6.2.1"}
+    return {"status": "ok", "version": "6.2.2"}
 
 
 # ============ 管理员认证 ============
@@ -1056,9 +1082,7 @@ async def admin_login(req: AdminLogin):
 @app.get("/api/admin/stats")
 async def admin_stats(request: Request, token: str = ""):
     """管理员统计，支持 header 和 query param 鉴权"""
-    auth = request.headers.get('Authorization', '')
-    effective_token = auth.replace('Bearer ', '') if auth.startswith('Bearer ') else token
-    if effective_token != ADMIN_PWD:
+    if _get_admin_token(request, token) != ADMIN_PWD:
         raise HTTPException(status_code=401, detail="未授权")
     books = _load_json(BOOKS_FILE, [])
     rules = _load_json(RULES_FILE, [])
@@ -1078,9 +1102,7 @@ async def admin_stats(request: Request, token: str = ""):
 @app.post("/api/admin/seed")
 async def admin_reseed(request: Request, token: str = ""):
     """重置种子数据，支持 header 和 query param 鉴权"""
-    auth = request.headers.get('Authorization', '')
-    effective_token = auth.replace('Bearer ', '') if auth.startswith('Bearer ') else token
-    if effective_token != ADMIN_PWD:
+    if _get_admin_token(request, token) != ADMIN_PWD:
         raise HTTPException(status_code=401, detail="未授权")
     _save_json(BOOKS_FILE, [])
     _seed_books()
@@ -1090,9 +1112,7 @@ async def admin_reseed(request: Request, token: str = ""):
 
 @app.put("/api/admin/books/{book_id}/chapters/batch")
 async def batch_add_chapters(book_id: str, data: dict, request: Request, token: str = ""):
-    auth = request.headers.get('Authorization', '')
-    effective_token = auth.replace('Bearer ', '') if auth.startswith('Bearer ') else token
-    if effective_token != ADMIN_PWD:
+    if _get_admin_token(request, token) != ADMIN_PWD:
         raise HTTPException(status_code=401, detail="未授权")
     books = _load_json(BOOKS_FILE, [])
     for b in books:
