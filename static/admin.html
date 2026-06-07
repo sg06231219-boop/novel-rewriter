@@ -81,7 +81,7 @@ tr:hover td{background:var(--sf2)}
 <div class="login-wrap" id="loginWrap">
   <div class="login-box">
     <h1>📖 管理后台</h1>
-    <p>小说翻改工具 v6.2.1</p>
+    <p>小说翻改工具 v6.2.2</p>
     <input type="password" id="pwdInput" placeholder="管理员密码" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="btn btn-p" onclick="doLogin()">登录</button>
   </div>
@@ -238,12 +238,12 @@ function renderBooks() {
     const full = allBooks.find(x => x.id === b.id);
     const chars = full?._chars || 0;
     const chCount = b.chapter_count || 0;
-    html += `<tr class="book-row" id="brow_${b.id}" onclick="toggleBookDetail('${b.id}')">
+    html += `<tr class="book-row" id="brow_${b.id}" onclick="toggleBookDetail('${escJs(b.id)}')">
       <td><span class="arrow">▶</span></td>
       <td>${esc(b.title)}</td><td>${esc(b.author||'-')}</td><td>${chCount}</td>
       <td>${chars>0?chars.toLocaleString():'-'}</td>
       <td>${b.updated_at||'-'}</td>
-      <td><button class="btn btn-d btn-xs" onclick="event.stopPropagation();deleteBook('${b.id}')">删除</button></td>
+      <td><button class="btn btn-d btn-xs" onclick="event.stopPropagation();deleteBook('${escJs(b.id)}')">删除</button></td>
     </tr>
     <tr class="ch-table" id="cdetail_${b.id}"><td colspan="7">
       <div id="chcontent_${b.id}" style="padding:8px 0;color:var(--tx3);font-size:11px">加载中...</div>
@@ -266,8 +266,8 @@ async function toggleBookDetail(bookId) {
         let chHtml = '<table style="width:100%"><thead><tr><th>章节</th><th>字数</th><th>操作</th></tr></thead><tbody>';
         (book.chapters||[]).forEach(ch => {
           chHtml += `<tr><td>${esc(ch.title)}</td><td>${ch.content.length}</td>
-            <td><button class="btn btn-g btn-xs" onclick="editChapter('${bookId}','${ch.id}')">编辑</button>
-            <button class="btn btn-d btn-xs" onclick="deleteChapter('${bookId}','${ch.id}')">删除</button></td></tr>`;
+            <td><button class="btn btn-g btn-xs" onclick="editChapter('${escJs(bookId)}','${escJs(ch.id)}')">编辑</button>
+            <button class="btn btn-d btn-xs" onclick="deleteChapter('${escJs(bookId)}','${escJs(ch.id)}')">删除</button></td></tr>`;
         });
         chHtml += '</tbody></table>';
         chcontent.innerHTML = chHtml;
@@ -446,7 +446,8 @@ document.getElementById('confirmOk').onclick = function() {
 function toast(msg,type='ok') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast toast-${type} show`; setTimeout(()=>t.classList.remove('show'),2500); }
 function showLd() { document.getElementById('ldBg').classList.add('show'); }
 function hideLd() { document.getElementById('ldBg').classList.remove('show'); }
-function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function escJs(s) { if (!s) return ''; return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,'\\n').replace(/\r/g,'\\r'); }
 
 // 自动登录
 if (token) { showAdmin(); }
