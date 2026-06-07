@@ -160,3 +160,12 @@ textarea.ed:focus{outline:none}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
 ::-webkit-scrollbar-thumb:hover{background:var(--tx3)}
+
+/* 无障碍：减少动画 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
