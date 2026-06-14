@@ -10,7 +10,7 @@
 <meta property="og:description" content="AI驱动的小说文本改写平台，支持名称替换、句式改写、对照预览">
 <meta property="og:image" content="https://novel-rewriter.onrender.com/static/og-image.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
-<title>小说翻改工具 v6.2.2</title>
+<title>小说翻改工具 v7.0.0</title>
 <link rel="manifest" href="/static/manifest.json">
 <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -27,7 +27,8 @@
     <div class="topbar-right">
       <button class="btn btn-g btn-xs" data-action="toggleTheme" id="themeBtn" title="主题">🌙</button>
       <button class="btn btn-g btn-xs" data-action="showModal" data-args="'apiModal'" title="API设置">🔑</button>
-      <button class="btn btn-g btn-xs" data-action="downloadResult" title="下载">💾</button>
+      <button class="btn btn-g btn-xs" data-action="downloadResult" title="下载TXT">💾</button>
+      <button class="btn btn-g btn-xs" data-action="downloadResultJson" title="下载JSON">📦</button>
       <button class="btn btn-g btn-xs" data-action="importFile" title="导入文件">📁</button>
       <input type="file" id="fileInput" accept=".txt,.md,.text" style="display:none" onchange="handleFile(event)">
     </div>
