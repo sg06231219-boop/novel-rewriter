@@ -1,9 +1,11 @@
-// Service Worker for 小说翻改工具 PWA
-const CACHE_NAME = 'novel-rewriter-v6';
+// Service Worker for 小说翻改工具 PWA v7.0.0
+const CACHE_NAME = 'novel-rewriter-v7';
 const ASSETS = [
   '/',
   '/static/index.html',
   '/static/manifest.json',
+  '/static/css/style.css',
+  '/static/js/app.js',
   '/api/health'
 ];
 
