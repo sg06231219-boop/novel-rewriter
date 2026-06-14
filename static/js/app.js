@@ -1,4 +1,4 @@
-/* Novel Rewriter v6.2 - Main Application */
+/* Novel Rewriter v7.0.0 - Main Application */
 const API = '';
 let curBook = null, curCh = null, currentBookData = null;
 let allBooks = [];
@@ -125,7 +125,7 @@ function renderBookList() {
       chs.forEach((ch,i) => {
         const chOn = ch.id === curCh ? ' on' : '';
         const chEditing = ch.id === curCh && currentChTitle ? ' editing' : '';
-        html += `<div class="ch${chOn}${chEditing}" draggable="true"
+        html += `<div class="ch${chOn}${chEditing}" draggable="true" data-id="${esc(ch.id)}"
           ondragstart="dragStart(event,${i})"
           ondragover="dragOver(event)"
           ondragleave="dragLeave(event)"
@@ -177,11 +177,19 @@ function renderSearchResults(results, q) {
           <span class="ch-t">${esc(ch.title)}</span>
           <span style="font-size:9px;color:var(--wn);margin-left:4px">命中</span>
         </div>
-        <div style="padding:2px 8px 2px 36px;font-size:9px;color:var(--tx3);line-height:1.4;margin-bottom:3px">${esc(ch.snippet)}</div>`;
+        <div style="padding:2px 8px 2px 36px;font-size:9px;color:var(--tx3);line-height:1.4;margin-bottom:3px">${highlightSnippet(ch.snippet, q)}</div>`;
       });
     }
   });
   el.innerHTML = html;
+}
+
+function highlightSnippet(snippet, q) {
+  if (!q || !snippet) return esc(snippet);
+  const escaped = esc(snippet);
+  const qEsc = esc(q);
+  const regex = new RegExp('(' + qEsc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+  return escaped.replace(regex, '<span class="search-hl">$1</span>');
 }
 
 // ===== 章节拖拽排序（修复版）=====
@@ -205,10 +213,7 @@ function dropChapter(e, targetIdx) {
   if (dragIdx === null || dragIdx === targetIdx) return;
 
   const chEls = Array.from(document.querySelectorAll('.ch[draggable=true]'));
-  const chIds = chEls.map(el => {
-    const m = el.getAttribute('onclick').match(/'(ch_[^']+)'/);
-    return m ? m[1] : null;
-  }).filter(Boolean);
+  const chIds = chEls.map(el => el.dataset.id).filter(Boolean);
 
   if (chIds.length < 2) return;
 
@@ -556,27 +561,61 @@ function handleFile(event) {
 }
 
 // ===== 下载 =====
-function downloadResult() {
+function downloadResult(format) {
   const resultEl = document.getElementById('resultText');
   const t = resultEl.textContent;
   if (!t || t==='等待翻改...') { toast('没有可下载的内容','wn'); return; }
-  let content, fileName;
+  let content, fileName, mimeType;
+  const useJson = format === 'json';
+
   if (bookRewriteResult && bookRewriteResult.chapters && bookRewriteResult.chapters.length > 0) {
-    content = `《${bookRewriteResult.book_title}》翻改结果\n${'='.repeat(40)}\n\n`;
-    bookRewriteResult.chapters.forEach(ch => {
-      content += `${ch.title}\n${'-'.repeat(30)}\n${ch.rewritten}\n\n`;
-    });
-    fileName = `${bookRewriteResult.book_title}_翻改结果_${new Date().toISOString().slice(0,10)}.txt`;
+    if (useJson) {
+      const exportData = {
+        book_title: bookRewriteResult.book_title,
+        export_date: new Date().toISOString(),
+        total_chapters: bookRewriteResult.total_chapters,
+        total_replacements: bookRewriteResult.total_replacements,
+        chapters: bookRewriteResult.chapters.map(ch => ({
+          id: ch.id, title: ch.title, original: ch.original,
+          rewritten: ch.rewritten, replace_count: ch.replace_count,
+          replacements: ch.replacements
+        }))
+      };
+      content = JSON.stringify(exportData, null, 2);
+      fileName = `${bookRewriteResult.book_title}_翻改结果_${new Date().toISOString().slice(0,10)}.json`;
+      mimeType = 'application/json';
+    } else {
+      content = `《${bookRewriteResult.book_title}》翻改结果\n${'='.repeat(40)}\n\n`;
+      bookRewriteResult.chapters.forEach(ch => {
+        content += `${ch.title}\n${'-'.repeat(30)}\n${ch.rewritten}\n\n`;
+      });
+      fileName = `${bookRewriteResult.book_title}_翻改结果_${new Date().toISOString().slice(0,10)}.txt`;
+      mimeType = 'text/plain;charset=utf-8';
+    }
   } else {
-    content = t;
-    const chName = currentChTitle ? `_${currentChTitle}` : '';
-    fileName = `翻改结果${chName}_${new Date().toISOString().slice(0,10)}.txt`;
+    if (useJson) {
+      const exportData = {
+        chapter: currentChTitle || '未命名',
+        export_date: new Date().toISOString(),
+        original: document.getElementById('origText').value,
+        rewritten: t,
+        replacements: lastRewriteData ? lastRewriteData.replacements : []
+      };
+      content = JSON.stringify(exportData, null, 2);
+      fileName = `翻改结果_${currentChTitle||'未命名'}_${new Date().toISOString().slice(0,10)}.json`;
+      mimeType = 'application/json';
+    } else {
+      content = t;
+      const chName = currentChTitle ? `_${currentChTitle}` : '';
+      fileName = `翻改结果${chName}_${new Date().toISOString().slice(0,10)}.txt`;
+      mimeType = 'text/plain;charset=utf-8';
+    }
   }
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([content],{type:'text/plain;charset=utf-8'}));
+  a.href = URL.createObjectURL(new Blob([content],{type:mimeType}));
   a.download = fileName;
   a.click();
-  toast('已下载','ok');
+  toast(useJson ? '已下载JSON' : '已下载','ok');
 }
 
 // ===== 计数 =====
@@ -830,8 +869,8 @@ async function fetchVersion() {
   try {
     const r = await fetch(`${API}/api/health`);
     const d = await r.json();
-    document.getElementById('verBadge').textContent = d.version || '6.2';
-  } catch(e) { document.getElementById('verBadge').textContent = '6.2'; }
+    document.getElementById('verBadge').textContent = d.version || '7.0';
+  } catch(e) { document.getElementById('verBadge').textContent = '7.0'; }
 }
 
 // ===== 复制功能 =====
@@ -926,7 +965,8 @@ document.addEventListener("click", function(e) {
     case "copyText": copyText(args); break;
     case "createBook": createBook(); break;
     case "doRewrite": doRewrite(); break;
-    case "downloadResult": downloadResult(); break;
+    case "downloadResult": downloadResult('txt'); break;
+    case "downloadResultJson": downloadResult('json'); break;
     case "extractNames": extractNames(); break;
     case "hideModal": hideModal(args); break;
     case "importFile": importFile(); break;
