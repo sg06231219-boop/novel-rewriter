@@ -5,9 +5,7 @@
   --tx:#e0e0e0;--tx2:#999;--tx3:#555;
   --pm:#7c5cfc;--pm2:#5a3fd6;--pmbg:rgba(124,92,252,.1);
   --ac:#ff6b9d;--ok:#4ecdc4;--wn:#ffe66d;--dg:#ff6b6b}
-.light{
-  --bg:#f5f5fa;--sf:#fff;--sf2:#f0f0f5;--sf3:#e5e5ef;--bd:#d0d0da;
-  --tx:#1a1a2e;--tx2:#666;--tx3:#999}
+/* .light vars moved to section 4 (dark mode enhancement) */
 body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;background:var(--bg);color:var(--tx);height:100vh;overflow:hidden;transition:background .3s,color .3s}
 .app{display:flex;flex-direction:column;height:100vh}
 
@@ -161,6 +159,147 @@ textarea.ed:focus{outline:none}
 ::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
 ::-webkit-scrollbar-thumb:hover{background:var(--tx3)}
 
+/* 状态栏 */
+.sbar{background:var(--sf);border-top:1px solid var(--bd);padding:4px 10px;display:flex;align-items:center;gap:12px;font-size:10px;color:var(--tx2);flex-shrink:0}
+.sbar .v{color:var(--pm);font-weight:600}
+
+/* ===== 1. 阅读进度条 ===== */
+.reading-progress{
+  position:fixed;top:0;left:0;width:0;height:2px;
+  background:linear-gradient(90deg,#6c5ce7,#a29bfe,#7c5cfc);
+  z-index:200;transition:width .1s linear;
+  box-shadow:0 0 6px rgba(108,92,231,.5);
+}
+.light .reading-progress{
+  box-shadow:0 0 4px rgba(108,92,231,.3);
+}
+
+/* ===== 2. 回到顶部按钮 ===== */
+.back-to-top{
+  position:fixed;right:16px;bottom:20px;
+  width:40px;height:40px;border-radius:50%;
+  border:none;cursor:pointer;z-index:190;
+  background:var(--sf3);color:var(--tx2);
+  box-shadow:0 2px 10px rgba(0,0,0,.3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;opacity:0;visibility:hidden;
+  transition:opacity .25s,visibility .25s,background .2s,transform .2s;
+}
+.back-to-top.show{opacity:1;visibility:visible}
+.back-to-top:hover{
+  background:var(--pm);color:#fff;transform:translateY(-2px);
+  box-shadow:0 4px 14px rgba(124,92,252,.4);
+}
+.light .back-to-top{
+  background:#fff;color:#555;
+  box-shadow:0 2px 10px rgba(0,0,0,.12);
+}
+.light .back-to-top:hover{
+  background:var(--pm);color:#fff;
+}
+
+/* ===== 3. 骨架屏 ===== */
+@keyframes shimmer{
+  0%{background-position:-400px 0}
+  100%{background-position:400px 0}
+}
+.skeleton{
+  background:linear-gradient(90deg,var(--sf2) 25%,var(--sf3) 37%,var(--sf2) 63%);
+  background-size:800px 100%;
+  animation:shimmer 1.6s ease-in-out infinite;
+  border-radius:4px;
+}
+.light .skeleton{
+  background:linear-gradient(90deg,#eee 25%,#f5f5f5 37%,#eee 63%);
+  background-size:800px 100%;
+}
+/* 书库骨架行 */
+.skel-book{
+  height:42px;margin-bottom:2px;border-radius:5px;
+}
+.skel-book-inner{
+  display:flex;align-items:center;gap:8px;padding:8px;
+}
+.skel-book-icon{width:16px;height:16px;border-radius:3px;flex-shrink:0}
+.skel-book-text{flex:1}
+.skel-book-title{height:12px;width:60%;margin-bottom:6px;border-radius:3px}
+.skel-book-meta{height:8px;width:40%;border-radius:3px}
+/* 章节内容骨架段落 */
+.skel-para{
+  height:16px;margin-bottom:12px;border-radius:3px;
+}
+.skel-para:nth-child(1){width:92%}
+.skel-para:nth-child(2){width:78%}
+.skel-para:nth-child(3){width:85%}
+.skel-chapter-container{
+  padding:10px;
+}
+
+/* ===== 4. 暗色模式增强 ===== */
+.light{
+  --bg:#f5f5fa;
+  --sf:#ffffff;
+  --sf2:#f0f0f5;
+  --sf3:#e5e5ef;
+  --bd:#d0d0da;
+  --tx:#1a1a2e;
+  --tx2:#666;
+  --tx3:#999;
+}
+.light .topbar{
+  background:#fff;
+  box-shadow:0 1px 4px rgba(0,0,0,.06);
+}
+.light .toolbar{
+  background:#fff;
+  border-bottom-color:#e0e0e8;
+}
+.light .cmp-h{
+  background:#f7f7fc;
+  border-bottom-color:#e0e0e8;
+}
+.light textarea.ed{
+  background:#fafafe;
+}
+.light .panel-l,
+.light .panel-m{
+  background:#fff;
+  border-color:#e0e0e8;
+}
+.light .rc{
+  background:#f7f7fc;
+  border-color:#ddd;
+}
+.light .rc:hover{border-color:var(--pm)}
+.light .rc input{
+  background:#fff;border-color:#ddd;
+}
+.light .ep{
+  background:#f7f7fc;border-color:#ddd;
+}
+.light .nc{
+  background:#fff;border-color:#ddd;
+}
+.light .bk:hover{background:#f0f0f5}
+.light .ch:hover{background:#f0f0f5}
+.light .sbar{
+  background:#fff;border-top-color:#e0e0e8;
+}
+.light .modal{
+  background:#fff;box-shadow:0 8px 32px rgba(0,0,0,.12);
+}
+.light .modal select,
+.light .modal input[type=text],
+.light .modal textarea{
+  background:#f7f7fc;border-color:#ddd;
+}
+.light .batch-area textarea{
+  background:#f7f7fc;border-color:#ddd;
+}
+.light .font-btn{
+  background:#f7f7fc;border-color:#ddd;
+}
+
 /* 无障碍：减少动画 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -168,4 +307,5 @@ textarea.ed:focus{outline:none}
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  .skeleton{animation:none}
 }
