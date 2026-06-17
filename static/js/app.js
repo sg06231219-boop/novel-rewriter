@@ -114,12 +114,12 @@ function renderBookList() {
     const isExpanded = b.id === curBook && currentBookData;
     const on = b.id === curBook ? ' on' : '';
     const arrow = isExpanded ? '▼' : '▶';
-    html += `<div class="bk${on}" onclick="selectBook('${escJs(b.id)}')">`,
-      <span class="bi" style="font-size:8px">${arrow}</span>
-      <span class="bi">📖</span>
-      <div style="flex:1;min-width:0"><div class="bn">${esc(b.title)}</div><div class="bm">${b.author?esc(b.author)+' · ':''}${b.chapter_count}章</div></div>
-      <span class="bx" onclick="event.stopPropagation();confirmDelete('book','${escJs(b.id)}','「${escJs(b.title)}」')">×</span>
-    </div>`;
+    html += `<div class="bk${on}" onclick="selectBook('${escJs(b.id)}')">` +
+      `<span class="bi" style="font-size:8px">${arrow}</span>` +
+      `<span class="bi">📖</span>` +
+      `<div style="flex:1;min-width:0"><div class="bn">${esc(b.title)}</div><div class="bm">${b.author?esc(b.author)+' · ':''}${b.chapter_count}章</div></div>` +
+      `<span class="bx" onclick="event.stopPropagation();confirmDelete('book','${escJs(b.id)}','「${escJs(b.title)}」')">×</span>` +
+    `</div>`;
     if (isExpanded) {
       const chs = currentBookData.chapters || [];
       chs.forEach((ch,i) => {
@@ -249,6 +249,7 @@ async function selectBook(id) {
     curBook = null; curCh = null; currentBookData = null; currentChTitle = null;
     renderBookList();
     updateEditorButtons();
+    updateChapterNav();
     return;
   }
   curBook = id; curCh = null;
@@ -257,6 +258,7 @@ async function selectBook(id) {
     currentBookData = await r.json();
     renderBookList();
     updateEditorButtons();
+    updateChapterNav();
   } catch(e) { toast('加载失败','err'); }
 }
 
@@ -272,6 +274,7 @@ function loadChapterById(bookId, chId) {
   updateCnt(); saveDraft();
   renderBookList();
   updateEditorButtons();
+  updateChapterNav();
   toast(`已加载「${ch.title}」`,'ok');
 }
 
@@ -937,16 +940,69 @@ async function addChapter() {
   } catch(e) { toast('添加失败','err'); }
 }
 
-// ===== 键盘快捷键（智能保存）=====
+// ===== 键盘快捷键 =====
 document.addEventListener('keydown', e => {
-  if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); doRewrite(); }
-  if (e.key === 'Escape') { document.querySelectorAll('.modal-bg.show').forEach(m => m.classList.remove('show')); }
-  // Ctrl+S 智能保存
+  const tag = e.target.tagName;
+  const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  // Ctrl+Enter → 翻改
+  if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); doRewrite(); return; }
+  // Escape → 关闭模态框
+  if (e.key === 'Escape') { document.querySelectorAll('.modal-bg.show').forEach(m => m.classList.remove('show')); return; }
+  // Ctrl+S → 智能保存
   if (e.ctrlKey && e.key === 's') {
     e.preventDefault();
     if (curCh) { saveChapterContent(); } else { saveDraft(); toast('草稿已保存','ok'); }
+    return;
   }
+  // / → 聚焦搜索
+  if (e.key === '/' && !isInput) {
+    e.preventDefault();
+    const s = document.getElementById('bookSearch');
+    if (s) { s.focus(); s.select(); }
+    return;
+  }
+  // Ctrl+N → 新建书籍
+  if (e.ctrlKey && e.key === 'n') { e.preventDefault(); showModal('addBookModal'); return; }
+  // Ctrl+[ / Ctrl+] → 上一章/下一章
+  if (e.ctrlKey && (e.key === '[' || e.key === ']')) {
+    e.preventDefault();
+    navigateChapter(e.key === ']' ? 1 : -1);
+    return;
+  }
+  // Ctrl+→ / Ctrl+← → 下一章/上一章
+  if (e.ctrlKey && e.key === 'ArrowRight') { e.preventDefault(); navigateChapter(1); return; }
+  if (e.ctrlKey && e.key === 'ArrowLeft') { e.preventDefault(); navigateChapter(-1); return; }
 });
+
+// ===== 章节导航 =====
+function navigateChapter(direction) {
+  if (!curBook || !currentBookData || !currentBookData.chapters) return;
+  const chapters = currentBookData.chapters;
+  const curIdx = chapters.findIndex(c => c.id === curCh);
+  if (curIdx === -1) return;
+  const newIdx = curIdx + direction;
+  if (newIdx < 0 || newIdx >= chapters.length) {
+    toast(direction > 0 ? '已是最后一章' : '已是第一章', 'wn');
+    return;
+  }
+  loadChapterById(curBook, chapters[newIdx].id);
+  const chEl = document.querySelector('.ch.on');
+  if (chEl) chEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function updateChapterNav() {
+  const el = document.getElementById('chNav');
+  if (!el) return;
+  if (!(curCh && currentBookData && (currentBookData.chapters || []).length > 1)) {
+    el.style.display = 'none'; return;
+  }
+  el.style.display = 'inline-flex';
+  const chapters = currentBookData.chapters || [];
+  const curIdx = chapters.findIndex(c => c.id === curCh);
+  el.innerHTML = `<button class="ch-nav-btn" onclick="navigateChapter(-1)" ${curIdx <= 0 ? 'disabled' : ''} title="上一章 Ctrl+[">◀</button>` +
+    `<span style="padding:0 4px;min-width:28px;text-align:center;color:var(--tx2)">${curIdx + 1}/${chapters.length}</span>` +
+    `<button class="ch-nav-btn" onclick="navigateChapter(1)" ${curIdx >= chapters.length - 1 ? 'disabled' : ''} title="下一章 Ctrl+]">▶</button>`;
+}
 init();
 
 // ============ Event Delegation ============

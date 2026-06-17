@@ -43,7 +43,7 @@
     <div class="panel-l" id="panelL">
       <div class="ph"><h2>📚 书库</h2><button class="btn btn-p btn-xs" data-action="showModal" data-args="'addBookModal'">+ 新书</button></div>
       <div class="book-search">
-        <input id="bookSearch" placeholder="搜索书名/作者..." oninput="handleSearch()">
+        <input id="bookSearch" placeholder="搜索书名/作者...（按 / 快速搜索）" oninput="handleSearch()">
         <select id="searchScope" onchange="handleSearch()">
           <option value="title">书名搜索</option>
           <option value="content">内容搜索</option>
@@ -83,7 +83,7 @@
         </div>
       </div>
       <div style="padding:6px;border-top:1px solid var(--bd)">
-        <button class="btn btn-p" data-action="doRewrite" id="rewriteBtn" style="width:100%;padding:8px;font-size:12px">🚀 开始翻改</button>
+        <button class="btn btn-p" data-action="doRewrite" id="rewriteBtn" style="width:100%;padding:8px;font-size:12px" title="快捷键: Ctrl+Enter">🚀 开始翻改 (Ctrl+Enter)</button>
         <button class="btn btn-a" data-action="rewriteBookStream" id="rewriteBookBtn" style="width:100%;padding:8px;font-size:12px;margin-top:3px">📚 整本翻改(流式)</button>
         <div id="bookRewriteProgress" style="display:none;margin-top:4px">
           <div style="background:var(--sf2);border-radius:4px;overflow:hidden;height:16px;position:relative">
@@ -109,6 +109,7 @@
           <button class="font-btn" data-action="changeFontSize" data-args="1" title="增大字体">+</button>
         </div>
         <div class="counter">原文 <span id="cntO">0</span> 字 → 改写 <span id="cntR">0</span> 字</div>
+        <span id="chNav" style="display:none;margin-left:8px"></span>
       </div>
       <div class="cmp" id="cmpContainer">
         <div class="cmp-p" id="cmpOrig">

@@ -501,13 +501,21 @@ def extract_names_rule_based(text: str) -> Dict[str, List[str]]:
             continue
         filtered[name] = count
 
+    # 修复：前缀覆盖检测更保守，短名需要显著多于长名才移除长名
+    # 避免"李慕婉"(3字)被"李慕"(2字前缀)误删
     to_remove = set()
     for long_name in filtered:
         for short_name in filtered:
             if short_name == long_name or len(short_name) >= len(long_name):
                 continue
-            if long_name.startswith(short_name) and filtered[short_name] >= filtered[long_name]:
-                to_remove.add(long_name)
+            if long_name.startswith(short_name):
+                ratio = filtered[short_name] / max(filtered[long_name], 1)
+                # 短名需>=3倍频率才抑制长名（原逻辑为>=1倍，过于激进）
+                if ratio >= 3.0:
+                    to_remove.add(long_name)
+                elif ratio < 0.5:
+                    # 长名远多于短名，短名可能是长名的误提取片段
+                    to_remove.add(short_name)
     for n in to_remove:
         del filtered[n]
 
@@ -948,7 +956,7 @@ async def rewrite_book(book_id: str, req: BookRewriteRequest):
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "7.1.0"}
+    return {"status": "ok", "version": "7.2.0"}
 
 # ============ 管理员认证 ============
 
