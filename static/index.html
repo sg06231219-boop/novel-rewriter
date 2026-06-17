@@ -15,6 +15,10 @@
 <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
+<!-- 阅读进度条 -->
+<div class="reading-progress" id="readingProgress"></div>
+<!-- 回到顶部按钮 -->
+<button class="back-to-top" id="backToTop" title="回到顶部">⬆</button>
 <div class="app">
   <div class="topbar">
     <button class="btn btn-g btn-xs" data-action="togglePanel" data-args="'panelL'" title="书库">📚</button>
@@ -197,5 +201,81 @@
 <div class="toast" id="toast"></div>
 
 <script src="/static/js/app.js"></script>
+<script>
+// ===== 阅读进度条 =====
+(function(){
+  const bar = document.getElementById('readingProgress');
+  function updateProgress(){
+    // 主要滚动区域是 cmp-b 和 pb，取最大滚动比例
+    const scrollEls = document.querySelectorAll('.cmp-b, .pb');
+    let maxRatio = 0;
+    scrollEls.forEach(el => {
+      const ratio = el.scrollTop / (el.scrollHeight - el.clientHeight || 1);
+      if (ratio > maxRatio) maxRatio = ratio;
+    });
+    bar.style.width = (maxRatio * 100) + '%';
+  }
+  // 监听所有可滚动区域
+  document.addEventListener('scroll', updateProgress, true);
+  // 初始化
+  updateProgress();
+})();
+
+// ===== 回到顶部按钮 =====
+(function(){
+  const btn = document.getElementById('backToTop');
+  function checkScroll(){
+    // 检查所有可滚动区域是否有超过400px的
+    const scrollEls = document.querySelectorAll('.cmp-b, .pb');
+    let shouldShow = false;
+    scrollEls.forEach(el => {
+      if (el.scrollTop > 400) shouldShow = true;
+    });
+    btn.classList.toggle('show', shouldShow);
+  }
+  document.addEventListener('scroll', checkScroll, true);
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('.cmp-b, .pb').forEach(el => {
+      el.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+})();
+
+// ===== 骨架屏 =====
+// 书库骨架
+function showBookSkeleton(){
+  const el = document.getElementById('bookList');
+  let html = '';
+  for (let i = 0; i < 5; i++) {
+    html += '<div class="skeleton skel-book"><div class="skel-book-inner">'
+      + '<div class="skeleton skel-book-icon"></div>'
+      + '<div class="skel-book-text"><div class="skeleton skel-book-title"></div><div class="skeleton skel-book-meta"></div></div>'
+      + '</div></div>';
+  }
+  el.innerHTML = html;
+}
+// 章节内容骨架
+function showChapterSkeleton(){
+  const el = document.getElementById('resultText');
+  let html = '<div class="skel-chapter-container">';
+  for (let i = 0; i < 3; i++) {
+    html += '<div class="skeleton skel-para"></div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ===== 拦截加载函数，注入骨架屏 =====
+const _origLoadBooks = loadBooks;
+loadBooks = async function(){
+  showBookSkeleton();
+  return _origLoadBooks.apply(this, arguments);
+};
+const _origLoadChapterById = loadChapterById;
+loadChapterById = function(){
+  showChapterSkeleton();
+  return _origLoadChapterById.apply(this, arguments);
+};
+</script>
 </body>
 </html>
