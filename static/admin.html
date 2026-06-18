@@ -81,7 +81,7 @@ tr:hover td{background:var(--sf2)}
 <div class="login-wrap" id="loginWrap">
   <div class="login-box">
     <h1>📖 管理后台</h1>
-    <p>小说翻改工具 v7.0.0</p>
+    <p>小说翻改工具 v7.3.0</p>
     <input type="password" id="pwdInput" placeholder="管理员密码" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="btn btn-p" onclick="doLogin()">登录</button>
   </div>
@@ -109,6 +109,19 @@ tr:hover td{background:var(--sf2)}
       </div>
     </div>
 
+    <!-- 批量操作栏（选中书籍后显示） -->
+    <div class="section" id="batchBar" style="display:none;border-color:var(--ac)">
+      <div class="section-h">
+        <h2>📦 批量操作</h2>
+        <span style="font-size:11px;color:var(--ac)" id="batchCount">已选 0 本</span>
+      </div>
+      <div class="section-b" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-d btn-sm" onclick="batchDelete()">🗑 删除选中</button>
+        <button class="btn btn-g btn-sm" onclick="batchSetAuthor()">✏️ 批量设作者</button>
+        <button class="btn btn-g btn-sm" onclick="clearSelection()">✕ 取消选择</button>
+      </div>
+    </div>
+
     <!-- 书库管理 -->
     <div class="section">
       <div class="section-h">
@@ -117,7 +130,7 @@ tr:hover td{background:var(--sf2)}
       </div>
       <div class="section-b" style="padding:0">
         <table>
-          <thead><tr><th style="width:30px"></th><th>书名</th><th>作者</th><th>章节</th><th>字数</th><th>更新时间</th><th>操作</th></tr></thead>
+          <thead><tr><th style="width:26px"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()" title="全选" style="accent-color:var(--ac)"></th><th style="width:30px"></th><th>书名</th><th>作者</th><th>章节</th><th>字数</th><th>更新时间</th><th>操作</th></tr></thead>
           <tbody id="booksTbody"></tbody>
         </table>
       </div>
@@ -231,25 +244,28 @@ function renderBooks() {
   const q = (document.getElementById('adminSearch')?.value || '').toLowerCase();
   const filtered = q ? allBooks.filter(b => b.title.toLowerCase().includes(q) || (b.author||'').toLowerCase().includes(q)) : allBooks;
   const tb = document.getElementById('booksTbody');
-  if (!filtered.length) { tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--tx3)">暂无书籍</td></tr>'; return; }
+  if (!filtered.length) { tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--tx3)">暂无书籍</td></tr>'; return; }
   let html = '';
   filtered.forEach((b, idx) => {
-    // 计算字数
     const full = allBooks.find(x => x.id === b.id);
     const chars = full?._chars || 0;
     const chCount = b.chapter_count || 0;
-    html += `<tr class="book-row" id="brow_${b.id}" onclick="toggleBookDetail('${escJs(b.id)}')">
-      <td><span class="arrow">▶</span></td>
-      <td>${esc(b.title)}</td><td>${esc(b.author||'-')}</td><td>${chCount}</td>
-      <td>${chars>0?chars.toLocaleString():'-'}</td>
-      <td>${b.updated_at||'-'}</td>
+    html += `<tr class="book-row" id="brow_${b.id}">
+      <td onclick="event.stopPropagation()"><input type="checkbox" class="book-check" value="${escJs(b.id)}" onchange="onBookCheck()" style="accent-color:var(--ac)"></td>
+      <td onclick="toggleBookDetail('${escJs(b.id)}')"><span class="arrow">▶</span></td>
+      <td onclick="toggleBookDetail('${escJs(b.id)}')">${esc(b.title)}</td>
+      <td onclick="toggleBookDetail('${escJs(b.id)}')">${esc(b.author||'-')}</td>
+      <td onclick="toggleBookDetail('${escJs(b.id)}')">${chCount}</td>
+      <td onclick="toggleBookDetail('${escJs(b.id)}')">${chars>0?chars.toLocaleString():'-'}</td>
+      <td onclick="toggleBookDetail('${escJs(b.id)}')">${b.updated_at||'-'}</td>
       <td><button class="btn btn-d btn-xs" onclick="event.stopPropagation();deleteBook('${escJs(b.id)}')">删除</button></td>
     </tr>
-    <tr class="ch-table" id="cdetail_${b.id}"><td colspan="7">
+    <tr class="ch-table" id="cdetail_${b.id}"><td colspan="8">
       <div id="chcontent_${b.id}" style="padding:8px 0;color:var(--tx3);font-size:11px">加载中...</div>
     </td></tr>`;
   });
   tb.innerHTML = html;
+  updateBatchBar();
 }
 
 async function toggleBookDetail(bookId) {
@@ -441,6 +457,72 @@ document.getElementById('confirmOk').onclick = function() {
   if (confirmCallback) confirmCallback();
   closeConfirmModal();
 };
+
+// ====== 批量操作 ======
+function getSelectedBooks() {
+  const checks = document.querySelectorAll('.book-check:checked');
+  return Array.from(checks).map(c => c.value);
+}
+function onBookCheck() {
+  updateBatchBar();
+}
+function toggleSelectAll() {
+  const checked = document.getElementById('selectAll').checked;
+  document.querySelectorAll('.book-check').forEach(c => c.checked = checked);
+  updateBatchBar();
+}
+function updateBatchBar() {
+  const selected = getSelectedBooks();
+  const bar = document.getElementById('batchBar');
+  const count = document.getElementById('batchCount');
+  bar.style.display = selected.length ? 'block' : 'none';
+  count.textContent = `已选 ${selected.length} 本`;
+  document.getElementById('selectAll').checked = 
+    selected.length > 0 && selected.length === document.querySelectorAll('.book-check').length;
+}
+function clearSelection() {
+  document.querySelectorAll('.book-check').forEach(c => c.checked = false);
+  document.getElementById('selectAll').checked = false;
+  updateBatchBar();
+}
+async function batchDelete() {
+  const ids = getSelectedBooks();
+  if (!ids.length) return;
+  showConfirm(`确定删除选中的 ${ids.length} 本书？此操作不可撤销。`, async () => {
+    showLd();
+    try {
+      const r = await fetch(`${API}/api/admin/books/batch-delete`, {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+        body: JSON.stringify({ids})
+      });
+      const d = await r.json();
+      toast(`已删除 ${d.deleted} 本`,'ok');
+      refreshData();
+    } catch(e) { toast('批量删除失败','err'); }
+    finally { hideLd(); }
+  });
+}
+function batchSetAuthor() {
+  const ids = getSelectedBooks();
+  if (!ids.length) return;
+  openEditModal('✏️ 批量设置作者', [
+    {label: '新作者名', value: ''}
+  ], async function(vals) {
+    const author = vals[0];
+    if (!author) { toast('请输入作者名','err'); return; }
+    showLd();
+    try {
+      const r = await fetch(`${API}/api/admin/books/batch-update`, {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+        body: JSON.stringify({ids, author})
+      });
+      const d = await r.json();
+      toast(`已更新 ${d.updated} 本作者为「${author}」`,'ok');
+      refreshData();
+    } catch(e) { toast('批量更新失败','err'); }
+    finally { hideLd(); }
+  });
+}
 
 // ====== 工具 ======
 function toast(msg,type='ok') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast toast-${type} show`; setTimeout(()=>t.classList.remove('show'),2500); }

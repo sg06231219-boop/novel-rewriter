@@ -828,6 +828,39 @@ async def delete_book(book_id: str):
     _delete_book(book_id)
     return {"ok": True}
 
+class BatchDelete(BaseModel):
+    ids: List[str]
+
+class BatchUpdate(BaseModel):
+    ids: List[str]
+    author: Optional[str] = None
+
+@app.post("/api/admin/books/batch-delete")
+async def batch_delete_books(req: BatchDelete, request: Request):
+    _verify_admin(request)
+    conn = _get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        f"DELETE FROM books WHERE id IN ({','.join('?'*len(req.ids))})",
+        req.ids
+    )
+    conn.commit()
+    return {"ok": True, "deleted": cur.rowcount}
+
+@app.post("/api/admin/books/batch-update")
+async def batch_update_books(req: BatchUpdate, request: Request):
+    _verify_admin(request)
+    if not req.author:
+        raise HTTPException(400, "author is required")
+    conn = _get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        f"UPDATE books SET author=?, updated_at=? WHERE id IN ({','.join('?'*len(req.ids))})",
+        [req.author, datetime.now().isoformat()] + req.ids
+    )
+    conn.commit()
+    return {"ok": True, "updated": cur.rowcount}
+
 class BookUpdate(BaseModel):
     title: Optional[str] = None
     author: Optional[str] = None
@@ -965,7 +998,7 @@ async def rewrite_book(book_id: str, req: BookRewriteRequest):
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "7.2.0"}
+    return {"status": "ok", "version": "7.3.0"}
 
 # ============ 管理员认证 ============
 
