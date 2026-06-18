@@ -464,6 +464,10 @@ BAD_PHRASES = {
     "成为", "作为", "当作", "看作", "算是", "出来", "起来", "下去",
 }
 BAD_ENDINGS = set("了着过地得来去出起上下里外中又是的而有所在把被")
+
+# 地名/组织名的噪声前缀：介词、动词、虚词等
+BAD_NAME_PREFIXES = set("在于是从由向往朝对比为给与跟同和及或但而站坐躺住停走跑飞")
+
 BAD_LOCS = {
     "大山", "小山", "高山", "深山", "出山", "山河", "江山", "大海", "深海",
     "上海", "北海", "南海", "东海", "西海", "江南", "河南", "河北", "湖南", "湖北",
@@ -541,14 +545,19 @@ def extract_names_rule_based(text: str) -> Dict[str, List[str]]:
         r'([\u4e00-\u9fff]{1,3}(?:' + '|'.join(LOC_SUFFIXES) + r'))'
     )
     locs = set(loc_pat.findall(text))
-    locations = sorted(l for l in locs if l not in BAD_LOCS)[:20]
+    locations = sorted(l for l in locs if l not in BAD_LOCS
+        and l[0] not in BAD_NAME_PREFIXES
+        and not any(c in BAD_NAME_PREFIXES for c in l))[:20]
 
     org_pat = re.compile(
         r'([\u4e00-\u9fff]{1,2}(?:' + '|'.join(ORG_SUFFIXES) + r'))'
     )
     orgs = set(org_pat.findall(text))
     organizations = sorted(
-        o for o in orgs if o not in BAD_ORGS and not o.startswith("的")
+        o for o in orgs if o not in BAD_ORGS
+        and o[0] not in BAD_NAME_PREFIXES
+        and not any(c in BAD_NAME_PREFIXES for c in o)
+        and not o.startswith("的")
     )[:20]
 
     item_pat = re.compile(
