@@ -836,8 +836,9 @@ class BatchUpdate(BaseModel):
     author: Optional[str] = None
 
 @app.post("/api/admin/books/batch-delete")
-async def batch_delete_books(req: BatchDelete, request: Request):
-    _verify_admin(request)
+async def batch_delete_books(req: BatchDelete, request: Request, token: str = ""):
+    if not _get_admin_token(request, token):
+        raise HTTPException(401, "未授权")
     conn = _get_conn()
     cur = conn.cursor()
     cur.execute(
@@ -848,8 +849,9 @@ async def batch_delete_books(req: BatchDelete, request: Request):
     return {"ok": True, "deleted": cur.rowcount}
 
 @app.post("/api/admin/books/batch-update")
-async def batch_update_books(req: BatchUpdate, request: Request):
-    _verify_admin(request)
+async def batch_update_books(req: BatchUpdate, request: Request, token: str = ""):
+    if not _get_admin_token(request, token):
+        raise HTTPException(401, "未授权")
     if not req.author:
         raise HTTPException(400, "author is required")
     conn = _get_conn()
