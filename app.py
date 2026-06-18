@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""灏忚缈绘敼宸ュ叿 v7.1.0
-鏂板姛鑳斤細绉嶅瓙鏁版嵁澶栭儴JSON鍖栵紙瑙ｅ喅鍐峰惎鍔ㄨ秴鏃讹級銆?
-      SQLite鏁版嵁鎸佷箙鍖栵紙瑙ｅ喅Render閲嶅惎涓㈡暟鎹棶棰橈級銆?
-      鎼滅储缁撴灉楂樹寒銆佹暣鏈鍑篔SON銆佹嫋鎷芥帓搴廳ata-id銆?
-      PWA manifest icons淇銆佺増鏈彿缁熶竴
+"""小说翻改工具 v7.1.0
+新功能：种子数据外部JSON化（解决冷启动超时）、
+      SQLite数据持久化（解决Render重启丢数据问题）、
+      搜索结果高亮、整本导出JSON、拖拽排序data-id、
+      PWA manifest icons修复、版本号统一
 """
 
 from fastapi import FastAPI, HTTPException, Request
@@ -27,13 +27,13 @@ app = FastAPI(title="Novel Rewriter v7.1.0")
 ADMIN_PWD = os.environ.get("ADMIN_PASSWORD", "admin123")
 DB_PATH = os.environ.get("DB_PATH", "data/novel_rewriter.db")
 
-# ============ SQLite 鍒濆鍖?============
+# ============ SQLite 初始化 ============
 
 def _init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    # 涔︾睄琛?
+    # 书籍表
     c.execute("""CREATE TABLE IF NOT EXISTS books (
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
@@ -41,7 +41,7 @@ def _init_db():
         created_at TEXT,
         updated_at TEXT
     )""")
-    # 绔犺妭琛?
+    # 章节表
     c.execute("""CREATE TABLE IF NOT EXISTS chapters (
         id TEXT PRIMARY KEY,
         book_id TEXT NOT NULL,
@@ -50,14 +50,14 @@ def _init_db():
         sort_order INTEGER DEFAULT 0,
         FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
     )""")
-    # 瑙勫垯妯℃澘琛?
+    # 规则模板表
     c.execute("""CREATE TABLE IF NOT EXISTS rules (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         rules_json TEXT NOT NULL,
         created_at TEXT
     )""")
-    # 杩佺Щ锛氬鏋滆〃瀛樺湪浣嗙己灏?sort_order 鍒楋紝鍒欐坊鍔?
+    # 迁移：如果表存在但缺少 sort_order 列，则添加
     try:
         c.execute("ALTER TABLE chapters ADD COLUMN sort_order INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
@@ -70,13 +70,13 @@ def _get_conn():
     conn.row_factory = sqlite3.Row
     return conn
 
-# ============ 绉嶅瓙鏁版嵁 ============
-# 绉嶅瓙鏁版嵁宸叉彁鍙栬嚦 seed_books.json锛屽惎鍔ㄦ椂鎸夐渶鍔犺浇
+# ============ 种子数据 ============
+# 种子数据已提取至 seed_books.json，启动时按需加载
 
 _SEED_BOOKS_CACHE = None
 
 def _load_seed_books():
-    """浠?seed_books.json 鍔犺浇绉嶅瓙鏁版嵁锛堝甫缂撳瓨锛?""
+    """从 seed_books.json 加载种子数据（带缓存）"""
     global _SEED_BOOKS_CACHE
     if _SEED_BOOKS_CACHE is None:
         json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'seed_books.json')
@@ -86,7 +86,7 @@ def _load_seed_books():
 
 
 def _seed_db():
-    """濡傛灉鏁版嵁搴撲负绌猴紝鐏屽叆绉嶅瓙鏁版嵁"""
+    """如果数据库为空，灌入种子数据"""
     conn = _get_conn()
     cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM books")
@@ -113,7 +113,7 @@ def _seed_db():
 _init_db()
 _seed_db()
 
-# ============ 鏁版嵁璁块棶杈呭姪 ============
+# ============ 数据访问辅助 ============
 
 def _load_books():
     conn = _get_conn()
@@ -221,7 +221,7 @@ def _delete_chapter(book_id, ch_id):
     conn = _get_conn()
     cur = conn.cursor()
     cur.execute("DELETE FROM chapters WHERE id=? AND book_id=?", (ch_id, book_id))
-    # 閲嶆柊鎺掑簭
+    # 重新排序
     cur.execute("SELECT id FROM chapters WHERE book_id=? ORDER BY sort_order, id", (book_id,))
     for i, r in enumerate(cur.fetchall()):
         cur.execute("UPDATE chapters SET sort_order=? WHERE id=?", (i, r["id"]))
@@ -286,16 +286,16 @@ def _check_rate_limit(ip: str):
     now = time.time()
     RATE_LIMIT[ip] = [t for t in RATE_LIMIT[ip] if now - t < 60]
     if len(RATE_LIMIT[ip]) >= 30:
-        raise HTTPException(status_code=429, detail="璇锋眰杩囦簬棰戠箒锛岃绋嶅悗鍐嶈瘯")
+        raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
     RATE_LIMIT[ip].append(now)
-    # 娓呯悊杩囨湡IP锛堥槻姝㈠唴瀛樻硠婕忥級
+    # 清理过期IP（防止内存泄漏）
     if len(RATE_LIMIT) > 1000:
         cutoff = now - 300
         for key in list(RATE_LIMIT.keys()):
             if all(t < cutoff for t in RATE_LIMIT[key]):
                 del RATE_LIMIT[key]
 
-# ============ 绠＄悊鍛楾oken ============
+# ============ 管理员Token ============
 
 def _get_admin_token(request: Request, token: str = ""):
     from starlette.requests import Request as StarletteRequest
@@ -306,7 +306,7 @@ def _get_admin_token(request: Request, token: str = ""):
         return ADMIN_PWD
     return None
 
-# ============ 鏁版嵁妯″瀷 ============
+# ============ 数据模型 ============
 
 class ReplaceRule(BaseModel):
     original: str
@@ -341,7 +341,7 @@ class RulesSave(BaseModel):
     name: str
     rules: List[ReplaceRule]
 
-# ============ 鏍稿績閫昏緫 ============
+# ============ 核心逻辑 ============
 
 def apply_rules(text: str, rules: List[ReplaceRule]) -> tuple:
     result = text
@@ -409,82 +409,82 @@ def call_ai(prompt: str, api_key: str, provider: str, stream: bool = False):
         data = resp.json()
         if "choices" in data:
             return data["choices"][0]["message"]["content"]
-        raise ValueError("AI 杩斿洖鏍煎紡寮傚父")
+        raise ValueError("AI 返回格式异常")
 
 def ai_rewrite(text: str, api_key: str,
                intensity: str = "medium", provider: str = "zhipu") -> str:
     desc = {
-        "light": "杞诲井鏀瑰啓锛屽彧鏇挎崲閮ㄥ垎璇嶆眹锛屼繚鎸佸彞寮忕粨鏋?,
-        "medium": "涓瓑鏀瑰啓锛屽彉鎹㈠彞寮忓拰琛ㄨ揪锛屼繚鎸佸墽鎯呬笉鍙?,
-        "heavy": "澶у箙鏀瑰啓锛屾崲鍙欒堪椋庢牸锛屼繚鎸佸墽鎯呮鏋朵笉鍙?
+        "light": "轻微改写，只替换部分词汇，保持句式结构",
+        "medium": "中等改写，变换句式和表达，保持剧情不变",
+        "heavy": "大幅改写，换叙述风格，保持剧情框架不变"
     }
-    prompt = f"""浣犳槸涓撲笟灏忚鏀瑰啓甯堛€傝姹傦細
+    prompt = f"""你是专业小说改写师。要求：
 1. {desc.get(intensity, desc['medium'])}
-2. 鍓ф儏瀹屽叏涓嶅彉锛屼汉鐗?鍦扮偣/鐗╁搧鍚嶇О涓嶅彉
-3. 淇濇寔鍘熸湁鏂囬
-4. 涓嶆坊鍔犱笉鍒犲噺鍐呭
-5. 鍙緭鍑烘敼鍐欏悗鐨勬枃鏈紝涓嶈瑙ｉ噴
+2. 剧情完全不变，人物/地点/物品名称不变
+3. 保持原有文风
+4. 不添加不删减内容
+5. 只输出改写后的文本，不要解释
 
-鍘熸枃锛?
+原文：
 {text}"""
     return call_ai(prompt, api_key, provider)
 
-# ---- 鍚嶇О鎻愬彇 ----
+# ---- 名称提取 ----
 
 SURNAMES = set(
-    "璧甸挶瀛欐潕鍛ㄥ惔閮戠帇鍐檲瑜氬崼钂嬫矆闊╂潹鏈辩Е灏よ浣曞悤鏂藉紶瀛旀浌涓ュ崕"
-    "閲戦瓘闄跺鎴氳阿閭瑰柣鏌忔按绐︾珷浜戣嫃娼樿憶濂氳寖褰儙椴侀煢鏄岄┈鑻楀嚖鑺辨柟淇?
-    "浠昏鏌抽矋鍙插攼钖涢浄璐哄€堡娈风綏姣曢儩瀹夊父榻愬悍浼嶄綑鍏冨崪椤惧瓱骞抽粍鍜岀﹩钀?
-    "灏瑰閭垫箾姹姣涚鐙勭背璐濇槑鑷ц浼忔垚鎴磋皥瀹嬭寘搴炵唺绾垝灞堥」绁濊懀姊佹潨闃?
-    "钃濋椀甯楹诲己璐捐矾濞勫嵄姹熺棰滈儹姊呯洓鏋楅挓寰愰偙楠嗛珮澶忚敗鐢版▕鑳″噷闇嶈櫈涓?
-    "鏀煰绠″崲鑾粡鎴垮共瑙ｅ簲瀹椾竵閭撻儊鍗曟椽鍖呰宸︾煶宕旈練绋嬭４闄嗚崳鏇插灏佸偍闈虫"
-    "瀵屽帆涔岀劍宸村紦鐗у北璋疯溅渚彮浠扮浠蹭紛瀹畞浠囨牼鏆寸敇鍘夋垘绁栨绗﹀垬鏅┕鏉熼緳"
-    "鍙跺垢鍙搁粠钖勫嵃瀹跨櫧鎬€钂查偘浠庨剛绱㈠捀绫嶈禆鍗撳睜钂欐睜涔旀浘娌欏吇闉犻』涓板发鍏崇浉鏌?
-    "鍚庤崋绾㈡父鏉冪洊鐩婃鍏嵂鍙ら瓟閭丹闈掔櫧绱巹澶╁菇鍐ヨ褰辩伒浠欏墤鍦ｅ皧甯濈殗鐜?
+    "赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华"
+    "金魏陶姜戚谢邹喻柏水窦章云苏潘葛奚范彭郎鲁韦昌马苗凤花方俞"
+    "任袁柳鲍史唐薛雷贺倪汤殷罗毕郝安常齐康伍余元卜顾孟平黄和穆萧"
+    "尹姚邵湛汪祁毛禹狄米贝明臧计伏成戴谈宋茅庞熊纪舒屈项祝董梁杜阮"
+    "蓝闵席季麻强贾路娄危江童颜郭梅盛林钟徐邱骆高夏蔡田樊胡凌霍虞万"
+    "支柯管卢莫经房干解应宗丁邓郁单洪包诸左石崔龚程裴陆荣曲家封储靳段"
+    "富巫乌焦巴弓牧山谷车侯班仰秋仲伊宫宁仇栾暴甘厉戎祖武符刘景詹束龙"
+    "叶幸司黎薄印宿白怀蒲邰从鄂索咸籍赖卓屠蒙池乔曾沙养鞠须丰巢关相查"
+    "后荆红游权盖益桓公药古魔邪赤青白紫玄天幽冥血影灵仙剑圣尊帝皇王"
 )
-LOC_SUFFIXES = ("鍩?, "灞?, "璋?, "娴?, "宀?, "婀?, "娌?, "姹?,
-                  "宄?, "宕?, "娲?, "绐?, "鏋?, "鍘?, "婕?, "娉?,
-                  "娓?, "娼?, "婧?, "娉?, "宸?, "閮?, "鐪?, "闀?,
-                  "鏉?, "鍏?, "娓?, "妗?, "浜?)
-ORG_SUFFIXES = ("闂?, "娲?, "瀹?, "闃?, "妤?, "搴?, "鍫?, "瀵?,
-                  "瀹?, "娈?, "鍫?, "闄?, "甯?, "鐩?, "鏁?, "瀵?, "瑙?)
-ITEM_SUFFIXES = ("鍓?, "鍒€", "鏋?, "鏂?, "閿?, "寮?, "鎵?, "鐝?,
-                  "濉?, "榧?, "闀?, "鐡?, "鐏?, "鍗?, "绗?, "涓?,
-                  "鑽?, "鑽?, "璇€", "鍏?, "鍥?, "鍗?, "浠?, "鐗?)
+LOC_SUFFIXES = ("城", "山", "谷", "海", "岛", "湖", "河", "江",
+                  "峰", "崖", "洞", "窟", "林", "原", "漠", "泽",
+                  "渊", "潭", "溪", "泉", "州", "郡", "省", "镇",
+                  "村", "关", "渡", "桥", "亭")
+ORG_SUFFIXES = ("门", "派", "宗", "阁", "楼", "庄", "堡", "寨",
+                  "宫", "殿", "堂", "院", "帮", "盟", "教", "寺", "观")
+ITEM_SUFFIXES = ("剑", "刀", "枪", "斧", "锤", "弓", "扇", "珠",
+                  "塔", "鼎", "镜", "瓶", "灯", "印", "符", "丹",
+                  "药", "草", "诀", "典", "图", "卷", "令", "牌")
 
 BAD_PHRASES = {
-    "涓€涓?, "涓€浜?, "涓€鏍?, "涓€鐩?, "涓€鏃?, "涓€鍒?, "涓€璧?, "涓€鑸?,
-    "涓嶆槸", "涓嶈兘", "涓嶅彲", "涓嶇煡", "涓嶈繃", "涓嶄簡", "涓嶈", "涓嶅悓", "涓嶄細",
-    "浠€涔?, "鎬庝箞", "杩欎釜", "閭ｄ釜", "杩欎簺", "閭ｄ簺", "杩欐牱", "閭ｆ牱",
-    "宸茬粡", "姝ｅ湪", "鍙互", "搴旇", "蹇呴』", "鍙兘", "鑷繁",
-    "鍥犱负", "鎵€浠?, "浣嗘槸", "鑰屼笖", "鎴栬€?, "濡傛灉", "铏界劧", "灏辨槸", "杩樻槸",
-    "鍙槸", "鍙湁", "涓嶇", "鏃犺", "浠栦滑", "鎴戜滑", "浣犱滑",
-    "鍑烘潵", "璧锋潵", "涓嬫潵", "涓婂幓", "杩囧幓", "鍥炴潵", "杩囨潵", "鍑哄幓",
-    "鐜板湪", "褰撴椂", "鏃跺€?, "杩欓噷", "閭ｉ噷", "涔嬪悗", "涔嬪墠", "浠ュ悗", "浠ュ墠",
-    "鎴愪负", "浣滀负", "褰撲綔", "鐪嬩綔", "绠楁槸", "鍑烘潵", "璧锋潵", "涓嬪幓",
+    "一个", "一些", "一样", "一直", "一时", "一切", "一起", "一般",
+    "不是", "不能", "不可", "不知", "不过", "不了", "不要", "不同", "不会",
+    "什么", "怎么", "这个", "那个", "这些", "那些", "这样", "那样",
+    "已经", "正在", "可以", "应该", "必须", "可能", "自己",
+    "因为", "所以", "但是", "而且", "或者", "如果", "虽然", "就是", "还是",
+    "只是", "只有", "不管", "无论", "他们", "我们", "你们",
+    "出来", "起来", "下来", "上去", "过去", "回来", "过来", "出去",
+    "现在", "当时", "时候", "这里", "那里", "之后", "之前", "以后", "以前",
+    "成为", "作为", "当作", "看作", "算是", "出来", "起来", "下去",
 }
-BAD_ENDINGS = set("浜嗙潃杩囧湴寰楁潵鍘诲嚭璧蜂笂涓嬮噷澶栦腑鍙堟槸鐨勮€屾湁鎵€鍦ㄦ妸琚?)
+BAD_ENDINGS = set("了着过地得来去出起上下里外中又是的而有所在把被")
 
-# 鍦板悕/缁勭粐鍚嶇殑鍣０鍓嶇紑锛氫粙璇嶃€佸姩璇嶃€佽櫄璇嶇瓑
-BAD_NAME_PREFIXES = set("鍦ㄤ簬鏄粠鐢卞悜寰€鏈濆姣斾负缁欎笌璺熷悓鍜屽強鎴栦絾鑰岀珯鍧愯汉浣忓仠璧拌窇椋?)
+# 地名/组织名的噪声前缀：介词、动词、虚词等
+BAD_NAME_PREFIXES = set("在于是从由向往朝对比为给与跟同和及或但而站坐躺住停走跑飞")
 
 BAD_LOCS = {
-    "澶у北", "灏忓北", "楂樺北", "娣卞北", "鍑哄北", "灞辨渤", "姹熷北", "澶ф捣", "娣辨捣",
-    "涓婃捣", "鍖楁捣", "鍗楁捣", "涓滄捣", "瑗挎捣", "姹熷崡", "娌冲崡", "娌冲寳", "婀栧崡", "婀栧寳",
-    "灞变笢", "灞辫タ", "骞夸笢", "骞胯タ", "娴峰崡", "浜戝崡", "鍑哄煄", "杩涘煄", "鏀诲煄", "瀹堝煄",
-    "鐮村煄", "鍏ュ煄", "鍑哄叧", "杩囧叧", "鍏冲北",
-    "涓嬪北", "涓婂北", "鐏北", "鍐板北", "閾佸北", "閾滃北", "閾跺北", "閲戝北",
+    "大山", "小山", "高山", "深山", "出山", "山河", "江山", "大海", "深海",
+    "上海", "北海", "南海", "东海", "西海", "江南", "河南", "河北", "湖南", "湖北",
+    "山东", "山西", "广东", "广西", "海南", "云南", "出城", "进城", "攻城", "守城",
+    "破城", "入城", "出关", "过关", "关山",
+    "下山", "上山", "火山", "冰山", "铁山", "铜山", "银山", "金山",
 }
 BAD_ORGS = {
-    "鍑洪棬", "寮€闂?, "鍏抽棬", "鏁查棬", "杩涢棬", "鐑棬", "鍐烽棬", "姝ｆ淳", "鍙嶆淳",
-    "鑰佹淳", "鏂版淳", "姘旀淳", "鍚岀洘", "缁撶洘", "鑱旂洘", "鍔犵洘", "澶ф", "姝ｆ",
-    "鍋忔", "娈垮爞", "澶╁", "榫欏", "鏈堝", "鍐峰", "澶ч棬", "涓棬", "鍚庨棬",
-    "鍓嶉棬", "涓撻棬", "閮ㄩ棬", "浣涢棬",
-    "鍏ラ棬", "鍑洪棬", "鍏抽棬", "寮€闂?, "閭棬", "瀵归棬", "杩囬棬",
+    "出门", "开门", "关门", "敲门", "进门", "热门", "冷门", "正派", "反派",
+    "老派", "新派", "气派", "同盟", "结盟", "联盟", "加盟", "大殿", "正殿",
+    "偏殿", "殿堂", "天宫", "龙宫", "月宫", "冷宫", "大门", "中门", "后门",
+    "前门", "专门", "部门", "佛门",
+    "入门", "出门", "关门", "开门", "邪门", "对门", "过门",
 }
 BAD_ITEMS = {
-    "澶у墤", "灏忓垁", "鐏灙", "閾侀敜", "鏈ㄥ紦", "绾告墖", "鐢电伅", "閾滈暅",
-    "鎵撳垁", "鎷斿墤", "閰嶅墤", "甯﹀垁", "鎷挎灙", "涓炬枾", "椋炴枾",
+    "大剑", "小刀", "火枪", "铁锤", "木弓", "纸扇", "电灯", "铜镜",
+    "打刀", "拔剑", "配剑", "带刀", "拿枪", "举斧", "飞斧",
 }
 
 def extract_names_rule_based(text: str) -> Dict[str, List[str]]:
@@ -505,8 +505,8 @@ def extract_names_rule_based(text: str) -> Dict[str, List[str]]:
             continue
         filtered[name] = count
 
-    # 淇锛氬墠缂€瑕嗙洊妫€娴嬫洿淇濆畧锛岀煭鍚嶉渶瑕佹樉钁楀浜庨暱鍚嶆墠绉婚櫎闀垮悕
-    # 閬垮厤"鏉庢厱濠?(3瀛?琚?鏉庢厱"(2瀛楀墠缂€)璇垹
+    # 修复：前缀覆盖检测更保守，短名需要显著多于长名才移除长名
+    # 避免"李慕婉"(3字)被"李慕"(2字前缀)误删
     to_remove = set()
     for long_name in filtered:
         for short_name in filtered:
@@ -514,11 +514,11 @@ def extract_names_rule_based(text: str) -> Dict[str, List[str]]:
                 continue
             if long_name.startswith(short_name):
                 ratio = filtered[short_name] / max(filtered[long_name], 1)
-                # 鐭悕闇€>=3鍊嶉鐜囨墠鎶戝埗闀垮悕锛堝師閫昏緫涓?=1鍊嶏紝杩囦簬婵€杩涳級
+                # 短名需>=3倍频率才抑制长名（原逻辑为>=1倍，过于激进）
                 if ratio >= 3.0:
                     to_remove.add(long_name)
                 elif ratio < 0.5:
-                    # 闀垮悕杩滃浜庣煭鍚嶏紝鐭悕鍙兘鏄暱鍚嶇殑璇彁鍙栫墖娈?
+                    # 长名远多于短名，短名可能是长名的误提取片段
                     to_remove.add(short_name)
     for n in to_remove:
         del filtered[n]
@@ -557,7 +557,7 @@ def extract_names_rule_based(text: str) -> Dict[str, List[str]]:
         o for o in orgs if o not in BAD_ORGS
         and o[0] not in BAD_NAME_PREFIXES
         and not any(c in BAD_NAME_PREFIXES for c in o)
-        and not o.startswith("鐨?)
+        and not o.startswith("的")
     )[:20]
 
     item_pat = re.compile(
@@ -574,7 +574,7 @@ def extract_names_rule_based(text: str) -> Dict[str, List[str]]:
         "other": []
     }
 
-# ============ API 璺敱 ============
+# ============ API 路由 ============
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
@@ -597,8 +597,8 @@ async def rewrite_text(req: RewriteRequest, request: Request):
                 )
             except Exception as e:
                 rep_details.append({
-                    "original": "鈿狅笍",
-                    "replacement": f"AI鏀瑰啓澶辫触: {e}",
+                    "original": "⚠️",
+                    "replacement": "AI改写失败，请重试",
                     "count": 0
                 })
 
@@ -620,31 +620,31 @@ async def extract_names(req: ExtractRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal server error")
 
-# ============ SSE娴佸紡缈绘敼 ============
+# ============ SSE流式翻改 ============
 
 @app.post("/api/rewrite/stream")
 async def rewrite_stream(req: RewriteRequest, request: Request):
     _check_rate_limit(request.client.host if request.client else "0.0.0.0")
     if not req.use_ai or not req.api_key:
-        raise HTTPException(status_code=400, detail="娴佸紡缈绘敼闇€瑕佸惎鐢ˋI骞舵彁渚汚PI Key")
+        raise HTTPException(status_code=400, detail="流式翻改需要启用AI并提供API Key")
 
     async def event_generator():
         import asyncio
         try:
-            yield f"data: {json.dumps({'type': 'status', 'msg': 'AI鏀瑰啓涓?..'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'msg': 'AI改写中...'}, ensure_ascii=False)}\n\n"
             desc = {
-                "light": "杞诲井鏀瑰啓锛屽彧鏇挎崲閮ㄥ垎璇嶆眹锛屼繚鎸佸彞寮忕粨鏋?,
-                "medium": "涓瓑鏀瑰啓锛屽彉鎹㈠彞寮忓拰琛ㄨ揪锛屼繚鎸佸墽鎯呬笉鍙?,
-                "heavy": "澶у箙鏀瑰啓锛屾崲鍙欒堪椋庢牸锛屼繚鎸佸墽鎯呮鏋朵笉鍙?
+                "light": "轻微改写，只替换部分词汇，保持句式结构",
+                "medium": "中等改写，变换句式和表达，保持剧情不变",
+                "heavy": "大幅改写，换叙述风格，保持剧情框架不变"
             }
-            prompt = f"""浣犳槸涓撲笟灏忚鏀瑰啓甯堛€傝姹傦細
+            prompt = f"""你是专业小说改写师。要求：
 1. {desc.get(req.ai_intensity, desc['medium'])}
-2. 鍓ф儏瀹屽叏涓嶅彉锛屼汉鐗?鍦扮偣/鐗╁搧鍚嶇О涓嶅彉
-3. 淇濇寔鍘熸湁鏂囬
-4. 涓嶆坊鍔犱笉鍒犲噺鍐呭
-5. 鍙緭鍑烘敼鍐欏悗鐨勬枃鏈紝涓嶈瑙ｉ噴
+2. 剧情完全不变，人物/地点/物品名称不变
+3. 保持原有文风
+4. 不添加不删减内容
+5. 只输出改写后的文本，不要解释
 
-鍘熸枃锛?
+原文：
 {req.text}"""
             stream_gen = call_ai(prompt, req.api_key, req.ai_provider, stream=True)
             full_text = ""
@@ -661,7 +661,7 @@ async def rewrite_stream(req: RewriteRequest, request: Request):
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
-# ============ 鎼滅储 API ============
+# ============ 搜索 API ============
 
 @app.get("/api/books/search")
 async def search_books(q: str = "", scope: str = "title", limit: int = 20, offset: int = 0):
@@ -692,7 +692,7 @@ async def search_books(q: str = "", scope: str = "title", limit: int = 20, offse
         conn.close()
         return {"results": results[offset:offset+limit], "total": total}
     else:
-        # 鍐呭鎼滅储
+        # 内容搜索
         cur.execute("SELECT id, title, author FROM books")
         books = cur.fetchall()
         results = []
@@ -700,7 +700,7 @@ async def search_books(q: str = "", scope: str = "title", limit: int = 20, offse
             cur2 = conn.cursor()
             if False:
                 pass
-            # 鎼滅储绔犺妭鍐呭
+            # 搜索章节内容
             cur2.execute(
                 "SELECT id, title, content FROM chapters WHERE book_id=? AND (title LIKE ? OR content LIKE ?) ORDER BY sort_order LIMIT 5",
                 (b["id"], f"%{q}%", f"%{q}%")
@@ -715,7 +715,7 @@ async def search_books(q: str = "", scope: str = "title", limit: int = 20, offse
                     matched_chapters.append({
                         "id": ch["id"],
                         "title": ch["title"],
-                        "snippet": snippet.replace(q, f"銆恵q}銆?),
+                        "snippet": snippet.replace(q, f"【{q}】"),
                     })
                 results.append({
                     "id": b["id"],
@@ -727,7 +727,7 @@ async def search_books(q: str = "", scope: str = "title", limit: int = 20, offse
         conn.close()
         return {"results": results[offset:offset+limit], "total": total}
 
-# ============ 绔犺妭鎺掑簭 API ============
+# ============ 章节排序 API ============
 
 class ChapterReorder(BaseModel):
     chapter_ids: List[str]
@@ -737,7 +737,7 @@ async def reorder_chapters(book_id: str, req: ChapterReorder):
     _reorder_chapters(book_id, req.chapter_ids)
     return {"ok": True}
 
-# ============ 涔﹀簱瀵煎嚭 API ============
+# ============ 书库导出 API ============
 
 @app.get("/api/books/export")
 async def export_books(book_id: str = None, format: str = "txt"):
@@ -751,7 +751,7 @@ async def export_books(book_id: str = None, format: str = "txt"):
         ids = [r["id"] for r in cur.fetchall()]
     if not ids:
         conn.close()
-        raise HTTPException(status_code=404, detail="鏈壘鍒颁功绫?)
+        raise HTTPException(status_code=404, detail="未找到书籍")
 
     books = []
     for bid in ids:
@@ -770,7 +770,7 @@ async def export_books(book_id: str = None, format: str = "txt"):
     else:
         lines = []
         for b in books:
-            lines.append(f"銆妠b['title']}銆?浣滆€咃細{b.get('author', '鏈煡')}")
+            lines.append(f"《{b['title']}》 作者：{b.get('author', '未知')}")
             lines.append("=" * 40)
             for ch in b.get("chapters", []):
                 lines.append(f"\n{ch['title']}")
@@ -784,17 +784,17 @@ async def export_books(book_id: str = None, format: str = "txt"):
             headers={"Content-Disposition": "attachment; filename=books_export.txt"}
         )
 
-# ---- 鏂囦欢瀵煎叆 ----
+# ---- 文件导入 ----
 
 @app.post("/api/import")
 async def import_file(data: dict):
     content = data.get("content", "")
     if not content:
-        raise HTTPException(status_code=400, detail="鍐呭涓嶈兘涓虹┖")
+        raise HTTPException(status_code=400, detail="内容不能为空")
     truncated = len(content) > 500000
     return {"content": content[:500000], "length": len(content), "truncated": truncated}
 
-# ============ 涔﹀簱 API ============
+# ============ 书库 API ============
 
 @app.get("/api/books")
 async def list_books():
@@ -820,7 +820,7 @@ async def create_book(req: BookCreate):
 async def get_book(book_id: str):
     book = _get_book(book_id)
     if not book:
-        raise HTTPException(status_code=404, detail="涔︾睄涓嶅瓨鍦?)
+        raise HTTPException(status_code=404, detail="书籍不存在")
     return book
 
 @app.delete("/api/books/{book_id}")
@@ -838,7 +838,7 @@ class BatchUpdate(BaseModel):
 @app.post("/api/admin/books/batch-delete")
 async def batch_delete_books(req: BatchDelete, request: Request, token: str = ""):
     if not _get_admin_token(request, token):
-        raise HTTPException(401, "鏈巿鏉?)
+        raise HTTPException(401, "未授权")
     conn = _get_conn()
     cur = conn.cursor()
     cur.execute(
@@ -851,7 +851,7 @@ async def batch_delete_books(req: BatchDelete, request: Request, token: str = ""
 @app.post("/api/admin/books/batch-update")
 async def batch_update_books(req: BatchUpdate, request: Request, token: str = ""):
     if not _get_admin_token(request, token):
-        raise HTTPException(401, "鏈巿鏉?)
+        raise HTTPException(401, "未授权")
     if not req.author:
         raise HTTPException(400, "author is required")
     conn = _get_conn()
@@ -917,7 +917,7 @@ async def delete_chapter(book_id: str, ch_id: str):
     _delete_chapter(book_id, ch_id)
     return {"ok": True}
 
-# ============ 瑙勫垯妯℃澘 API ============
+# ============ 规则模板 API ============
 
 @app.get("/api/rules")
 async def list_rules():
@@ -933,7 +933,7 @@ async def delete_rules(rule_id: str):
     _delete_rule(rule_id)
     return {"ok": True}
 
-# ============ 鏁存湰涔︾炕鏀?API ============
+# ============ 整本书翻改 API ============
 
 class BookRewriteRequest(BaseModel):
     rules: List[ReplaceRule]
@@ -947,14 +947,14 @@ class BookRewriteRequest(BaseModel):
 async def rewrite_book(book_id: str, req: BookRewriteRequest):
     book = _get_book(book_id)
     if not book:
-        raise HTTPException(status_code=404, detail="涔︾睄涓嶅瓨鍦?)
+        raise HTTPException(status_code=404, detail="书籍不存在")
 
     chapters = book.get("chapters", [])
     if req.chapter_ids:
         chapters = [ch for ch in chapters if ch["id"] in req.chapter_ids]
 
     if not chapters:
-        raise HTTPException(status_code=400, detail="娌℃湁鍙炕鏀圭殑绔犺妭")
+        raise HTTPException(status_code=400, detail="没有可翻改的章节")
 
     results = []
     for ch in chapters:
@@ -970,15 +970,15 @@ async def rewrite_book(book_id: str, req: BookRewriteRequest):
                 )
             except Exception as e:
                 rep_details.append({
-                    "original": "鈿狅笍",
-                    "replacement": f"AI鏀瑰啓澶辫触: {e}",
+                    "original": "⚠️",
+                    "replacement": "AI改写失败，请重试",
                     "count": 0
                 })
 
         rewritten, rule_reps = apply_rules(rewritten, req.rules)
         rep_details.extend(rule_reps)
 
-        total = sum(r["count"] for r in rep_details if r["original"] != "鈿狅笍")
+        total = sum(r["count"] for r in rep_details if r["original"] != "⚠️")
         results.append({
             "id": ch["id"],
             "title": ch["title"],
@@ -996,13 +996,13 @@ async def rewrite_book(book_id: str, req: BookRewriteRequest):
         "chapters": results,
     }
 
-# ============ 鍋ュ悍妫€鏌?============
+# ============ 健康检查 ============
 
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "version": "7.3.0"}
 
-# ============ 绠＄悊鍛樿璇?============
+# ============ 管理员认证 ============
 
 from starlette.middleware.sessions import SessionMiddleware
 app.add_middleware(SessionMiddleware, secret_key="novel-rewriter-secret-key-2026")
@@ -1013,14 +1013,14 @@ class AdminLogin(BaseModel):
 @app.post("/api/admin/login")
 async def admin_login(req: AdminLogin, request: Request):
     if req.password != ADMIN_PWD:
-        raise HTTPException(status_code=401, detail="瀵嗙爜閿欒")
+        raise HTTPException(status_code=401, detail="密码错误")
     request.session["admin_authed"] = True
     return {"ok": True, "token": ADMIN_PWD}
 
 @app.get("/api/admin/stats")
 async def admin_stats(request: Request, token: str = ""):
     if _get_admin_token(request, token) != ADMIN_PWD:
-        raise HTTPException(status_code=401, detail="鏈巿鏉?)
+        raise HTTPException(status_code=401, detail="未授权")
     conn = _get_conn()
     cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM books")
@@ -1042,7 +1042,7 @@ async def admin_stats(request: Request, token: str = ""):
 @app.post("/api/admin/seed")
 async def admin_reseed(request: Request, token: str = ""):
     if _get_admin_token(request, token) != ADMIN_PWD:
-        raise HTTPException(status_code=401, detail="鏈巿鏉?)
+        raise HTTPException(status_code=401, detail="未授权")
     conn = _get_conn()
     cur = conn.cursor()
     cur.execute("DELETE FROM chapters")
@@ -1060,7 +1060,7 @@ async def admin_reseed(request: Request, token: str = ""):
 @app.put("/api/admin/books/{book_id}/chapters/batch")
 async def batch_add_chapters(book_id: str, data: dict, request: Request, token: str = ""):
     if _get_admin_token(request, token) != ADMIN_PWD:
-        raise HTTPException(status_code=401, detail="鏈巿鏉?)
+        raise HTTPException(status_code=401, detail="未授权")
     conn = _get_conn()
     cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM chapters WHERE book_id=?", (book_id,))
@@ -1070,7 +1070,7 @@ async def batch_add_chapters(book_id: str, data: dict, request: Request, token: 
         ch_id = f"ch_{book_id}_{existing+i+1:02d}"
         cur.execute(
             "INSERT INTO chapters (id, book_id, title, content, sort_order) VALUES (?,?,?,?,?)",
-            (ch_id, book_id, ch.get("title", f"绗瑊existing+i+1}绔?), ch.get("content", ""), existing+i)
+            (ch_id, book_id, ch.get("title", f"第{existing+i+1}章"), ch.get("content", ""), existing+i)
         )
     cur.execute("UPDATE books SET updated_at=? WHERE id=?",
                 (datetime.now().isoformat()[:19], book_id))
