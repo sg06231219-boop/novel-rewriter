@@ -621,6 +621,30 @@ function downloadResult(format) {
   toast(useJson ? '已下载JSON' : '已下载','ok');
 }
 
+// ===== 导出 EPUB =====
+async function downloadResultEpub() {
+  if (!currentBookData || !currentBookData.id) {
+    toast('请先打开一本书','wn'); return;
+  }
+  try {
+    toast('正在生成 EPUB...','ok');
+    const resp = await fetch(API + '/books/export?book_id=' + encodeURIComponent(currentBookData.id) + '&format=epub');
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      toast(err.detail || '导出失败','er');
+      return;
+    }
+    const blob = await resp.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${currentBookData.title || 'book'}.epub`;
+    a.click();
+    toast('已导出 EPUB','ok');
+  } catch(e) {
+    toast('导出失败','er');
+  }
+}
+
 // ===== 计数 =====
 function updateCnt() {
   const o = document.getElementById('origText').value;
@@ -1023,6 +1047,7 @@ document.addEventListener("click", function(e) {
     case "doRewrite": doRewrite(); break;
     case "downloadResult": downloadResult('txt'); break;
     case "downloadResultJson": downloadResult('json'); break;
+    case "downloadResultEpub": downloadResultEpub(); break;
     case "extractNames": extractNames(); break;
     case "hideModal": hideModal(args); break;
     case "importFile": importFile(); break;

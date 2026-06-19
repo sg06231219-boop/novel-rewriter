@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""小说翻改工具 v7.1.0
+"""小说翻改工具 v7.4.0
 新功能：种子数据外部JSON化（解决冷启动超时）、
       SQLite数据持久化（解决Render重启丢数据问题）、
       搜索结果高亮、整本导出JSON、拖拽排序data-id、
@@ -8,7 +8,7 @@
 """
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Optional
@@ -21,8 +21,11 @@ from collections import Counter
 from datetime import datetime
 import sqlite3
 import asyncio
+from ebooklib import epub
+import uuid
+import io
 
-app = FastAPI(title="Novel Rewriter v7.1.0")
+app = FastAPI(title="Novel Rewriter v7.4.0")
 
 ADMIN_PWD = os.environ.get("ADMIN_PASSWORD", "admin123")
 DB_PATH = os.environ.get("DB_PATH", "data/novel_rewriter.db")
@@ -737,6 +740,88 @@ async def reorder_chapters(book_id: str, req: ChapterReorder):
     _reorder_chapters(book_id, req.chapter_ids)
     return {"ok": True}
 
+# ============ EPUB 生成 ============
+
+def _generate_epub(books: list) -> tuple:
+    """生成 EPUB 文件字节流，返回 (bytes, filename)"""
+    book_epub = epub.EpubBook()
+
+    if len(books) == 1:
+        b = books[0]
+        book_epub.set_title(b.get("title", "小说合集"))
+        book_epub.add_author(b.get("author", "未知作者"))
+        filename = f"{b['title']}.epub"
+    else:
+        book_epub.set_title("小说合集")
+        book_epub.add_author("多作者")
+        filename = "novel_collection.epub"
+    book_epub.set_language("zh")
+    book_epub.add_metadata(None, "meta", "", {"name": "generator", "content": "Novel Rewriter"})
+
+    spine = []
+    toc = []
+
+    style = epub.EpubItem(
+        uid="style", file_name="style/default.css", media_type="text/css",
+        content=b"body { font-family: 'Noto Sans CJK SC', 'SimSun', serif; line-height: 1.9; padding: 0 1em; } "
+               b"h1 { text-align: center; margin-top: 1em; } "
+               b"h2 { text-align: center; color: #555; } "
+               b"h3 { margin-top: 1.5em; } "
+               b"p { text-indent: 2em; margin: 0.5em 0; }"
+    )
+    book_epub.add_item(style)
+
+    cover_html = f'<html><head><title>目录</title><link rel="stylesheet" href="style/default.css" type="text/css"/></head><body><h1>{book_epub.title}</h1><h2>{book_epub.get_metadata("DC", "creator")}</h2></body></html>'
+    cover = epub.EpubHtml(title="封面", file_name="cover.xhtml", lang="zh")
+    cover.content = cover_html
+    cover.add_item(style)
+    book_epub.add_item(cover)
+    spine.append(cover)
+    toc.append(epub.Link("cover.xhtml", "封面", "cover"))
+
+    ch_num = 0
+    for book_idx, b in enumerate(books):
+        chapters = b.get("chapters", [])
+        if len(books) > 1 and chapters:
+            book_title_html = f'<html><head><title>{b["title"]}</title></head><body><h1>{b["title"]}</h1><h2>{b.get("author", "")}</h2></body></html>'
+            book_title_page = epub.EpubHtml(title=b["title"], file_name=f"book_{book_idx}.xhtml", lang="zh")
+            book_title_page.content = book_title_html
+            book_title_page.add_item(style)
+            book_epub.add_item(book_title_page)
+            spine.append(book_title_page)
+            toc.append(epub.Link(f"book_{book_idx}.xhtml", b["title"], f"book_{book_idx}"))
+
+        toc_children = []
+        for ch in chapters:
+            ch_num += 1
+            file_id = f"ch_{ch_num:04d}"
+            title = ch.get("title", f"第{ch_num}章")
+            content = ch.get("content", "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            paragraphs = content.split("\n")
+            p_html = "".join(f"<p>{p or '&nbsp;'}</p>" for p in paragraphs)
+            ch_html = f'<html><head><title>{title}</title><link rel="stylesheet" href="style/default.css" type="text/css"/></head><body><h3>{title}</h3>{p_html}</body></html>'
+            ch_item = epub.EpubHtml(title=title, file_name=f"{file_id}.xhtml", lang="zh")
+            ch_item.content = ch_html
+            ch_item.add_item(style)
+            book_epub.add_item(ch_item)
+            spine.append(ch_item)
+            toc_children.append(epub.Link(f"{file_id}.xhtml", title, file_id))
+
+        if len(books) > 1 and toc_children:
+            toc[-1].children = toc_children
+        else:
+            toc.extend(toc_children)
+
+    book_epub.spine = spine
+    book_epub.toc = toc
+    book_epub.add_item(epub.EpubNcx())
+    book_epub.add_item(epub.EpubNav())
+
+    buf = io.BytesIO()
+    epub.write_epub(buf, book_epub, {})
+    return buf.getvalue(), filename
+
+
 # ============ 书库导出 API ============
 
 @app.get("/api/books/export")
@@ -766,6 +851,13 @@ async def export_books(book_id: str = None, format: str = "txt"):
             content=content,
             media_type="application/json",
             headers={"Content-Disposition": "attachment; filename=books_export.json"}
+        )
+    elif format == "epub":
+        epub_bytes, epub_filename = _generate_epub(books)
+        return Response(
+            content=epub_bytes,
+            media_type="application/epub+zip",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{epub_filename}"}
         )
     else:
         lines = []
@@ -1000,7 +1092,7 @@ async def rewrite_book(book_id: str, req: BookRewriteRequest):
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "7.3.0"}
+    return {"status": "ok", "version": "7.4.0"}
 
 # ============ 管理员认证 ============
 
