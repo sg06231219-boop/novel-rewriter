@@ -657,6 +657,8 @@ function updateCnt() {
 async function doRewrite() {
   const text = document.getElementById('origText').value.trim();
   if (!text) { toast('请先输入原文','wn'); return; }
+  // 付费墙：免费10次翻改，之后29元/月
+  if (!Paywall.tryUse('rewrite', { price: '29', desc: '无限次数翻改 · AI句式改写 · 名称替换 · 结果下载', freeLimit: 10, contactWx: 'a5050e' })) return;
   const rules = getRules();
   if (!rules.length) { toast('请添加替换规则','wn'); return; }
   const useAi = document.getElementById('useAi').checked;
