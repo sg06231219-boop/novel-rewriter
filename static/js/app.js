@@ -11,7 +11,7 @@ let viewMode = 'both';
 let isStreaming = false;
 let currentChTitle = null;
 
-// ===== 初始化 =====
+// ===== 初始�?=====
 async function init() {
   addRule();
   await loadBooks();
@@ -59,12 +59,12 @@ function setViewMode(mode) {
 function loadTheme() {
   const t = localStorage.getItem('nr_theme') || 'dark';
   document.body.classList.toggle('light', t === 'light');
-  document.getElementById('themeBtn').textContent = t === 'light' ? '☀️' : '🌙';
+  document.getElementById('themeBtn').textContent = t === 'light' ? '☀�? : '🌙';
 }
 function toggleTheme() {
   const isLight = document.body.classList.toggle('light');
   localStorage.setItem('nr_theme', isLight ? 'light' : 'dark');
-  document.getElementById('themeBtn').textContent = isLight ? '☀️' : '🌙';
+  document.getElementById('themeBtn').textContent = isLight ? '☀�? : '🌙';
 }
 
 // ===== 字体大小 =====
@@ -113,12 +113,12 @@ function renderBookList() {
   filtered.forEach(b => {
     const isExpanded = b.id === curBook && currentBookData;
     const on = b.id === curBook ? ' on' : '';
-    const arrow = isExpanded ? '▼' : '▶';
+    const arrow = isExpanded ? '�? : '�?;
     html += `<div class="bk${on}" onclick="selectBook('${escJs(b.id)}')">` +
       `<span class="bi" style="font-size:8px">${arrow}</span>` +
       `<span class="bi">📖</span>` +
-      `<div style="flex:1;min-width:0"><div class="bn">${esc(b.title)}</div><div class="bm">${b.author?esc(b.author)+' · ':''}${b.chapter_count}章</div></div>` +
-      `<span class="bx" onclick="event.stopPropagation();confirmDelete('book','${escJs(b.id)}','「${escJs(b.title)}」')">×</span>` +
+      `<div style="flex:1;min-width:0"><div class="bn">${esc(b.title)}</div><div class="bm">${b.author?esc(b.author)+' · ':''}${b.chapter_count}�?/div></div>` +
+      `<span class="bx" onclick="event.stopPropagation();confirmDelete('book','${escJs(b.id)}','�?{escJs(b.title)}�?)">×</span>` +
     `</div>`;
     if (isExpanded) {
       const chs = currentBookData.chapters || [];
@@ -133,7 +133,7 @@ function renderBookList() {
           ondragend="dragEnd(event)"
           onclick="loadChapterById('${escJs(b.id)}','${escJs(ch.id)}')">
           <span class="ch-t">${esc(ch.title)}</span>
-          <span class="ch-x" onclick="event.stopPropagation();confirmDelete('chapter','${escJs(ch.id)}','「${escJs(ch.title)}」')">×</span>
+          <span class="ch-x" onclick="event.stopPropagation();confirmDelete('chapter','${escJs(ch.id)}','�?{escJs(ch.title)}�?)">×</span>
         </div>`;
       });
       html += `<div class="ch-add" onclick="event.stopPropagation();showModal('addChModal')">+ 添加章节</div>`;
@@ -164,12 +164,12 @@ function handleSearch() {
 
 function renderSearchResults(results, q) {
   const el = document.getElementById('bookList');
-  if (!results.length) { el.innerHTML = '<div class="empty"><span class="e">🔍</span>未找到匹配内容</div>'; return; }
+  if (!results.length) { el.innerHTML = '<div class="empty"><span class="e">🔍</span>未找到匹配内�?/div>'; return; }
   let html = '<div style="padding:4px 8px;font-size:9px;color:var(--wn);margin-bottom:4px;cursor:pointer" onclick="loadBooks();handleSearch()">📖 内容搜索结果 · 点击返回书库</div>';
   results.forEach(b => {
     html += `<div class="bk" onclick="curBook=null;currentBookData=null;selectBook('${escJs(b.id)}')">
       <span class="bi">📖</span>
-      <div style="flex:1;min-width:0"><div class="bn">${esc(b.title)}</div><div class="bm">${b.author?esc(b.author)+' · ':''}${b.chapter_count||0}章</div></div>
+      <div style="flex:1;min-width:0"><div class="bn">${esc(b.title)}</div><div class="bm">${b.author?esc(b.author)+' · ':''}${b.chapter_count||0}�?/div></div>
     </div>`;
     if (b.matched_chapters && b.matched_chapters.length) {
       b.matched_chapters.slice(0, 3).forEach(ch => {
@@ -192,7 +192,7 @@ function highlightSnippet(snippet, q) {
   return escaped.replace(regex, '<span class="search-hl">$1</span>');
 }
 
-// ===== 章节拖拽排序（修复版）=====
+// ===== 章节拖拽排序（修复版�?====
 let dragIdx = null;
 function dragStart(e, idx) {
   dragIdx = idx;
@@ -237,7 +237,7 @@ async function reorderChapters(bookId, chapterIds) {
       method:'PUT', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({chapter_ids:chapterIds})
     });
-    toast('章节顺序已更新','ok');
+    toast('章节顺序已更�?,'ok');
     const r = await fetch(`${API}/api/books/${bookId}`);
     currentBookData = await r.json();
     renderBookList();
@@ -275,16 +275,16 @@ function loadChapterById(bookId, chId) {
   renderBookList();
   updateEditorButtons();
   updateChapterNav();
-  toast(`已加载「${ch.title}」`,'ok');
+  toast(`已加载�?{ch.title}」`,'ok');
 }
 
 async function selectBookAndChapter(bookId, chId) {
   await selectBook(bookId);
-  // 等待 DOM 更新后加载章节
+  // 等待 DOM 更新后加载章�?
   setTimeout(() => loadChapterById(bookId, chId), 100);
 }
 
-// ===== 编辑器按钮更新 =====
+// ===== 编辑器按钮更�?=====
 function updateEditorButtons() {
   const saveBtn = document.getElementById('saveChBtn');
   const applyBtn = document.getElementById('applyBtn');
@@ -305,7 +305,7 @@ function updateEditorButtons() {
 async function saveChapterContent() {
   if (!curBook || !curCh) { toast('请先选择章节','wn'); return; }
   const content = document.getElementById('origText').value;
-  showLd('保存中...');
+  showLd('保存�?..');
   try {
     const r = await fetch(`${API}/api/books/${curBook}/chapters/${curCh}`, {
       method:'PUT',
@@ -313,7 +313,7 @@ async function saveChapterContent() {
       body: JSON.stringify({ content })
     });
     if (!r.ok) throw new Error('保存失败');
-    toast('章节已保存','ok');
+    toast('章节已保�?,'ok');
     const r2 = await fetch(`${API}/api/books/${curBook}`);
     currentBookData = await r2.json();
     renderBookList();
@@ -321,15 +321,15 @@ async function saveChapterContent() {
   finally { hideLd(); }
 }
 
-// ===== 应用翻改结果到章节 =====
+// ===== 应用翻改结果到章�?=====
 async function applyResultToChapter() {
   if (!curBook || !curCh) { toast('请先选择章节','wn'); return; }
   const resultEl = document.getElementById('resultText');
   const resultText = resultEl.textContent;
-  if (!resultText || resultText === '等待翻改...' || resultText === '无翻改结果') {
+  if (!resultText || resultText === '等待翻改...' || resultText === '无翻改结�?) {
     toast('没有可应用的结果','wn'); return;
   }
-  // 提取纯文本（去除高亮标记）
+  // 提取纯文本（去除高亮标记�?
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = resultEl.innerHTML;
   const cleanText = tempDiv.textContent || tempDiv.innerText || resultText;
@@ -344,7 +344,7 @@ async function applyResultToChapter() {
 let deleteTarget = null;
 function confirmDelete(type, id, name) {
   deleteTarget = { type, id };
-  document.getElementById('confirmText').textContent = `确定要删除${name}吗？此操作不可撤销。`;
+  document.getElementById('confirmText').textContent = `确定要删�?{name}吗？此操作不可撤销。`;
   document.getElementById('confirmBtn').onclick = executeDelete;
   showModal('confirmModal');
 }
@@ -356,13 +356,13 @@ async function executeDelete() {
     if (type === 'book') {
       await fetch(`${API}/api/books/${id}`, {method:'DELETE'});
       if (curBook === id) { curBook = null; curCh = null; currentBookData = null; currentChTitle = null; }
-      toast('已删除','ok');
+      toast('已删�?,'ok');
       await loadBooks();
       updateEditorButtons();
     } else if (type === 'chapter' && curBook) {
       await fetch(`${API}/api/books/${curBook}/chapters/${id}`, {method:'DELETE'});
       if (curCh === id) { curCh = null; currentChTitle = null; }
-      toast('已删除','ok');
+      toast('已删�?,'ok');
       const r = await fetch(`${API}/api/books/${curBook}`);
       currentBookData = await r.json();
       await loadBooks();
@@ -371,7 +371,7 @@ async function executeDelete() {
       updateEditorButtons();
     } else if (type === 'template') {
       await fetch(`${API}/api/rules/${id}`, {method:'DELETE'});
-      toast('已删除','ok');
+      toast('已删�?,'ok');
       await loadTemplates();
     }
   } catch(e) { toast('删除失败','err'); }
@@ -385,7 +385,7 @@ function addRule(o='', r='') {
   const c = document.getElementById('rulesBox');
   const d = document.createElement('div');
   d.className = 'rc';
-  d.innerHTML = `<input type="text" placeholder="原名" value="${esc(o)}" class="oi"><span class="ar">→</span><input type="text" placeholder="新名" value="${esc(r)}" class="ri" oninput="updateRuleStat()"><button class="dx" onclick="this.closest('.rc').remove();updateRuleStat()">×</button>`;
+  d.innerHTML = `<input type="text" placeholder="原名" value="${esc(o)}" class="oi"><span class="ar">�?/span><input type="text" placeholder="新名" value="${esc(r)}" class="ri" oninput="updateRuleStat()"><button class="dx" onclick="this.closest('.rc').remove();updateRuleStat()">×</button>`;
   c.appendChild(d);
   updateRuleStat();
 }
@@ -393,7 +393,7 @@ function clearRules() {
   document.getElementById('rulesBox').innerHTML = '';
   addRule();
   updateRuleStat();
-  toast('规则已清空','ok');
+  toast('规则已清�?,'ok');
 }
 function getRules() {
   const rules = [];
@@ -414,21 +414,21 @@ function parseBatch() {
   const lines = txt.split('\n').filter(l => l.trim());
   let count = 0;
   lines.forEach(line => {
-    const parts = line.split(/[→=]/);
+    const parts = line.split(/[�?]/);
     if (parts.length >= 2) {
-      const o = parts[0].trim(), r = parts.slice(1).join('→').trim();
+      const o = parts[0].trim(), r = parts.slice(1).join('�?).trim();
       if (o && r) { addRule(o, r); count++; }
     }
   });
   document.getElementById('batchInput').value = '';
-  toast(`已添加 ${count} 条规则`,'ok');
+  toast(`已添�?${count} 条规则`,'ok');
 }
 
 // ===== 智能提取 =====
 async function extractNames() {
   const text = document.getElementById('origText').value.trim();
   if (!text) { toast('请先输入原文','wn'); return; }
-  showLd('提取中...');
+  showLd('提取�?..');
   extractedNames = {};
   try {
     const r = await fetch(`${API}/api/extract`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text}) });
@@ -444,8 +444,8 @@ function showExtractResults(names) {
   el.innerHTML = '';
   const cats = [
     {key:'person', label:'👤 人物', cls:'tag-p'},
-    {key:'location', label:'🗺️ 地名', cls:'tag-l'},
-    {key:'organization', label:'🏛️ 组织', cls:'tag-o'},
+    {key:'location', label:'🗺�?地名', cls:'tag-l'},
+    {key:'organization', label:'🏛�?组织', cls:'tag-o'},
     {key:'item', label:'⚔️ 物品', cls:'tag-i'}
   ];
   let hasAny = false;
@@ -503,8 +503,8 @@ function renderTemplates(tps) {
   tps.forEach(t => {
     const d = document.createElement('div');
     d.className = 'tp-item';
-    d.innerHTML = `<span>${esc(t.name)} (${t.rules.length})</span><span class="bx" style="opacity:1;font-size:11px" onclick="event.stopPropagation();confirmDelete('template','${escJs(t.id)}','「${escJs(t.name)}」模板')">×</span>`;
-    d.onclick = () => { t.rules.forEach(r => addRule(r.original, r.replacement)); toast(`已加载 ${t.rules.length} 条规则`,'ok'); };
+    d.innerHTML = `<span>${esc(t.name)} (${t.rules.length})</span><span class="bx" style="opacity:1;font-size:11px" onclick="event.stopPropagation();confirmDelete('template','${escJs(t.id)}','�?{escJs(t.name)}」模�?)">×</span>`;
+    d.onclick = () => { t.rules.forEach(r => addRule(r.original, r.replacement)); toast(`已加�?${t.rules.length} 条规则`,'ok'); };
     el.appendChild(d);
   });
 }
@@ -517,7 +517,7 @@ async function saveTemplate() {
     await fetch(`${API}/api/rules`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name,rules}) });
     hideModal('saveTpModal');
     document.getElementById('tpName').value = '';
-    toast('模板已保存','ok');
+    toast('模板已保�?,'ok');
     await loadTemplates();
   } catch(e) { toast('保存失败','err'); }
 }
@@ -542,7 +542,7 @@ function saveApiKey() {
   const key = document.getElementById('apiKeyIn').value.trim();
   localStorage.setItem('nr_apikey_' + provider, key);
   hideModal('apiModal');
-  toast('API Key 已保存','ok');
+  toast('API Key 已保�?,'ok');
 }
 
 // ===== 文件导入 =====
@@ -557,7 +557,7 @@ function handleFile(event) {
     document.getElementById('origText').value = e.target.result;
     updateCnt();
     saveDraft();
-    toast(`已导入 ${file.name}`,'ok');
+    toast(`已导�?${file.name}`,'ok');
   };
   reader.readAsText(file, 'UTF-8');
   event.target.value = '';
@@ -588,7 +588,7 @@ function downloadResult(format) {
       fileName = `${bookRewriteResult.book_title}_翻改结果_${new Date().toISOString().slice(0,10)}.json`;
       mimeType = 'application/json';
     } else {
-      content = `《${bookRewriteResult.book_title}》翻改结果\n${'='.repeat(40)}\n\n`;
+      content = `�?{bookRewriteResult.book_title}》翻改结果\n${'='.repeat(40)}\n\n`;
       bookRewriteResult.chapters.forEach(ch => {
         content += `${ch.title}\n${'-'.repeat(30)}\n${ch.rewritten}\n\n`;
       });
@@ -598,14 +598,14 @@ function downloadResult(format) {
   } else {
     if (useJson) {
       const exportData = {
-        chapter: currentChTitle || '未命名',
+        chapter: currentChTitle || '未命�?,
         export_date: new Date().toISOString(),
         original: document.getElementById('origText').value,
         rewritten: t,
         replacements: lastRewriteData ? lastRewriteData.replacements : []
       };
       content = JSON.stringify(exportData, null, 2);
-      fileName = `翻改结果_${currentChTitle||'未命名'}_${new Date().toISOString().slice(0,10)}.json`;
+      fileName = `翻改结果_${currentChTitle||'未命�?}_${new Date().toISOString().slice(0,10)}.json`;
       mimeType = 'application/json';
     } else {
       content = t;
@@ -618,7 +618,7 @@ function downloadResult(format) {
   a.href = URL.createObjectURL(new Blob([content],{type:mimeType}));
   a.download = fileName;
   a.click();
-  toast(useJson ? '已下载JSON' : '已下载','ok');
+  toast(useJson ? '已下载JSON' : '已下�?,'ok');
 }
 
 // ===== 导出 EPUB =====
@@ -639,7 +639,7 @@ async function downloadResultEpub() {
     a.href = URL.createObjectURL(blob);
     a.download = `${currentBookData.title || 'book'}.epub`;
     a.click();
-    toast('已导出 EPUB','ok');
+    toast('已导�?EPUB','ok');
   } catch(e) {
     toast('导出失败','er');
   }
@@ -653,14 +653,14 @@ function updateCnt() {
   document.getElementById('cntR').textContent = (r==='等待翻改...') ? 0 : r.length;
 }
 
-// ===== 翻改（非流式）=====
+// ===== 翻改（非流式�?====
 async function doRewrite() {
   const text = document.getElementById('origText').value.trim();
   if (!text) { toast('请先输入原文','wn'); return; }
-  // 付费墙：免费10次翻改，之后29元/月
-  if (!Paywall.tryUse('rewrite', { price: '29', desc: '无限次数翻改 · AI句式改写 · 名称替换 · 结果下载', freeLimit: 10, contactWx: 'a5050e' })) return;
+  // 付费墙：免费10次翻改，之后29�?�?
+  if (!Paywall.tryUse('rewrite', { price: '29', qrImg: '/static/img/donate-qr.png', desc: '无限次数翻改 · AI句式改写 · 名称替换 · 结果下载', freeLimit: 10, contactWx: 'a5050e' })) return;
   const rules = getRules();
-  if (!rules.length) { toast('请添加替换规则','wn'); return; }
+  if (!rules.length) { toast('请添加替换规�?,'wn'); return; }
   const useAi = document.getElementById('useAi').checked;
   const intensity = document.getElementById('aiLv').value;
   const provider = document.getElementById('aiProvider').value;
@@ -669,7 +669,7 @@ async function doRewrite() {
 
   const btn = document.getElementById('rewriteBtn');
   btn.disabled = true;
-  showLd(useAi ? 'AI改写中（可能需要30-60秒）...' : '翻改中...');
+  showLd(useAi ? 'AI改写中（可能需�?0-60秒）...' : '翻改�?..');
   try {
     const r = await fetch(`${API}/api/rewrite`, {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -684,7 +684,7 @@ async function doRewrite() {
     document.getElementById('sReps').textContent = total;
     document.getElementById('repInfo').textContent = `${total}处替换`;
     updateCnt();
-    toast(`翻改完成！${total}处替换`,'ok');
+    toast(`翻改完成�?{total}处替换`,'ok');
   } catch(e) { toast('翻改失败: '+e.message,'err'); }
   finally { btn.disabled = false; hideLd(); }
 }
@@ -708,11 +708,11 @@ function renderResult(data) {
   applyFontSize();
 }
 
-// ===== 整本翻改（SSE流式）=====
+// ===== 整本翻改（SSE流式�?====
 async function rewriteBookStream() {
   if (!curBook || !currentBookData) { toast('请先选择一本书','wn'); return; }
   const rules = getRules();
-  if (!rules.length) { toast('请添加替换规则','wn'); return; }
+  if (!rules.length) { toast('请添加替换规�?,'wn'); return; }
   const useAi = document.getElementById('useAi').checked;
   const intensity = document.getElementById('aiLv').value;
   const provider = document.getElementById('aiProvider').value;
@@ -729,13 +729,13 @@ async function rewriteBookStream() {
   bookRewriteResult = { book_id: curBook, book_title: currentBookData.title, total_chapters: 0, total_replacements: 0, chapters: [] };
 
   const resultEl = document.getElementById('resultText');
-  resultEl.innerHTML = '<div style="color:var(--tx3);font-size:11px;">📡 流式翻改中，请稍候...</div>';
+  resultEl.innerHTML = '<div style="color:var(--tx3);font-size:11px;">📡 流式翻改中，请稍�?..</div>';
 
   for (let i = 0; i < chapters.length; i++) {
     const ch = chapters[i];
     const pct = Math.round(((i + 1) / chapters.length) * 100);
     document.getElementById('brProgress').style.width = pct + '%';
-    document.getElementById('brProgressText').textContent = `第${i+1}/${chapters.length}章 ${pct}%`;
+    document.getElementById('brProgressText').textContent = `�?{i+1}/${chapters.length}�?${pct}%`;
     document.getElementById('brStatus').textContent = `正在翻改: ${ch.title}`;
 
     try {
@@ -761,7 +761,7 @@ async function rewriteBookStream() {
   showBookRewriteResult(bookRewriteResult);
   btn.disabled = false;
   progEl.style.display = 'none';
-  toast(`整本翻改完成！${bookRewriteResult.total_replacements}处替换`,'ok');
+  toast(`整本翻改完成�?{bookRewriteResult.total_replacements}处替换`,'ok');
 }
 
 // SSE流式翻改单章
@@ -806,7 +806,7 @@ function streamRewriteChapter(ch, rules, intensity, apiKey, provider) {
                   if (contentDiv) {
                     contentDiv.textContent = fullText;
                   } else {
-                    el.innerHTML = `<div style="font-size:11px;color:var(--pm)">正在翻改：${esc(ch.title)}</div><div style="margin-top:8px">${esc(fullText)}</div>`;
+                    el.innerHTML = `<div style="font-size:11px;color:var(--pm)">正在翻改�?{esc(ch.title)}</div><div style="margin-top:8px">${esc(fullText)}</div>`;
                   }
                   streamRenderTimer = null;
                 }, 100);
@@ -838,7 +838,7 @@ function showBookRewriteResult(data) {
   let html = '';
   (data.chapters || []).forEach(ch => {
     html += `<div style="margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--bd)">
-      <div style="font-size:11px;color:var(--pm);font-weight:bold;margin-bottom:4px">${esc(ch.title)} <span style="color:var(--tx3);font-weight:normal">(${ch.replace_count}处替换)</span></div>`;
+      <div style="font-size:11px;color:var(--pm);font-weight:bold;margin-bottom:4px">${esc(ch.title)} <span style="color:var(--tx3);font-weight:normal">(${ch.replace_count}处替�?</span></div>`;
     let chHtml = esc(ch.rewritten);
     if (ch.replacements) {
       const sorted = ch.replacements.filter(rp => rp.original !== '⚠️').sort((a,b) => b.replacement.length - a.replacement.length);
@@ -853,9 +853,9 @@ function showBookRewriteResult(data) {
     }
     html += `<div style="font-size:13px;line-height:1.9;white-space:pre-wrap;word-break:break-all">${chHtml}</div></div>`;
   });
-  if (!html) html = '<div style="color:var(--tx3)">无翻改结果</div>';
+  if (!html) html = '<div style="color:var(--tx3)">无翻改结�?/div>';
   el.innerHTML = html;
-  document.getElementById('repInfo').textContent = `${data.total_replacements}处替换 · ${data.total_chapters}章`;
+  document.getElementById('repInfo').textContent = `${data.total_replacements}处替�?· ${data.total_chapters}章`;
   document.getElementById('cntR').textContent = el.textContent.length;
 }
 
@@ -893,7 +893,7 @@ function toast(msg,type='ok') { const t=document.getElementById('toast'); t.text
 function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function escJs(s) { if (!s) return ''; return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,'\\n').replace(/\r/g,'\\r'); }
 
-// ===== 版本号 =====
+// ===== 版本�?=====
 async function fetchVersion() {
   try {
     const r = await fetch(`${API}/api/health`);
@@ -906,33 +906,33 @@ async function fetchVersion() {
 function copyText(id) {
   const el = document.getElementById(id);
   const text = el.value || el.textContent;
-  navigator.clipboard.writeText(text).then(() => toast('已复制','ok')).catch(() => {
+  navigator.clipboard.writeText(text).then(() => toast('已复�?,'ok')).catch(() => {
     const ta = document.createElement('textarea');
     ta.value = text; document.body.appendChild(ta);
     ta.select(); document.execCommand('copy');
     document.body.removeChild(ta);
-    toast('已复制','ok');
+    toast('已复�?,'ok');
   });
 }
 function copyResult() {
   const text = document.getElementById('resultText').textContent;
   if (!text || text === '等待翻改...') { toast('没有可复制的内容','wn'); return; }
-  navigator.clipboard.writeText(text).then(() => toast('已复制','ok')).catch(() => {
+  navigator.clipboard.writeText(text).then(() => toast('已复�?,'ok')).catch(() => {
     const ta = document.createElement('textarea');
     ta.value = text; document.body.appendChild(ta);
     ta.select(); document.execCommand('copy');
     document.body.removeChild(ta);
-    toast('已复制','ok');
+    toast('已复�?,'ok');
   });
 }
 
 // ===== 创建书籍 =====
 async function createBook() {
   const title = document.getElementById('newBookTitle').value.trim();
-  if (!title) { toast('请输入书名','wn'); return; }
+  if (!title) { toast('请输入书�?,'wn'); return; }
   const author = document.getElementById('newBookAuthor').value.trim();
   const content = document.getElementById('newBookContent').value.trim();
-  const chapters = content ? [{ title:'第一章', content }] : [];
+  const chapters = content ? [{ title:'第一�?, content }] : [];
   try {
     const r = await fetch(`${API}/api/books`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title,author,chapters}) });
     const d = await r.json();
@@ -940,7 +940,7 @@ async function createBook() {
     document.getElementById('newBookTitle').value='';
     document.getElementById('newBookAuthor').value='';
     document.getElementById('newBookContent').value='';
-    toast(`「${title}」已创建`,'ok');
+    toast(`�?{title}」已创建`,'ok');
     await loadBooks();
     await selectBook(d.id);
   } catch(e) { toast('创建失败','err'); }
@@ -949,15 +949,15 @@ async function createBook() {
 // ===== 添加章节 =====
 async function addChapter() {
   if (!curBook) { toast('请先选择一本书','wn'); return; }
-  const title = document.getElementById('newChTitle').value.trim() || `第${Date.now()%10000}章`;
+  const title = document.getElementById('newChTitle').value.trim() || `�?{Date.now()%10000}章`;
   const content = document.getElementById('newChContent').value.trim();
-  if (!content) { toast('请输入内容','wn'); return; }
+  if (!content) { toast('请输入内�?,'wn'); return; }
   try {
     await fetch(`${API}/api/books/${curBook}/chapters`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title,content}) });
     hideModal('addChModal');
     document.getElementById('newChTitle').value='';
     document.getElementById('newChContent').value='';
-    toast(`「${title}」已添加`,'ok');
+    toast(`�?{title}」已添加`,'ok');
     const r = await fetch(`${API}/api/books/${curBook}`);
     currentBookData = await r.json();
     await loadBooks();
@@ -966,36 +966,36 @@ async function addChapter() {
   } catch(e) { toast('添加失败','err'); }
 }
 
-// ===== 键盘快捷键 =====
+// ===== 键盘快捷�?=====
 document.addEventListener('keydown', e => {
   const tag = e.target.tagName;
   const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-  // Ctrl+Enter → 翻改
+  // Ctrl+Enter �?翻改
   if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); doRewrite(); return; }
-  // Escape → 关闭模态框
+  // Escape �?关闭模态框
   if (e.key === 'Escape') { document.querySelectorAll('.modal-bg.show').forEach(m => m.classList.remove('show')); return; }
-  // Ctrl+S → 智能保存
+  // Ctrl+S �?智能保存
   if (e.ctrlKey && e.key === 's') {
     e.preventDefault();
-    if (curCh) { saveChapterContent(); } else { saveDraft(); toast('草稿已保存','ok'); }
+    if (curCh) { saveChapterContent(); } else { saveDraft(); toast('草稿已保�?,'ok'); }
     return;
   }
-  // / → 聚焦搜索
+  // / �?聚焦搜索
   if (e.key === '/' && !isInput) {
     e.preventDefault();
     const s = document.getElementById('bookSearch');
     if (s) { s.focus(); s.select(); }
     return;
   }
-  // Ctrl+N → 新建书籍
+  // Ctrl+N �?新建书籍
   if (e.ctrlKey && e.key === 'n') { e.preventDefault(); showModal('addBookModal'); return; }
-  // Ctrl+[ / Ctrl+] → 上一章/下一章
+  // Ctrl+[ / Ctrl+] �?上一�?下一�?
   if (e.ctrlKey && (e.key === '[' || e.key === ']')) {
     e.preventDefault();
     navigateChapter(e.key === ']' ? 1 : -1);
     return;
   }
-  // Ctrl+→ / Ctrl+← → 下一章/上一章
+  // Ctrl+�?/ Ctrl+�?�?下一�?上一�?
   if (e.ctrlKey && e.key === 'ArrowRight') { e.preventDefault(); navigateChapter(1); return; }
   if (e.ctrlKey && e.key === 'ArrowLeft') { e.preventDefault(); navigateChapter(-1); return; }
 });
@@ -1008,7 +1008,7 @@ function navigateChapter(direction) {
   if (curIdx === -1) return;
   const newIdx = curIdx + direction;
   if (newIdx < 0 || newIdx >= chapters.length) {
-    toast(direction > 0 ? '已是最后一章' : '已是第一章', 'wn');
+    toast(direction > 0 ? '已是最后一�? : '已是第一�?, 'wn');
     return;
   }
   loadChapterById(curBook, chapters[newIdx].id);
@@ -1025,9 +1025,9 @@ function updateChapterNav() {
   el.style.display = 'inline-flex';
   const chapters = currentBookData.chapters || [];
   const curIdx = chapters.findIndex(c => c.id === curCh);
-  el.innerHTML = `<button class="ch-nav-btn" onclick="navigateChapter(-1)" ${curIdx <= 0 ? 'disabled' : ''} title="上一章 Ctrl+[">◀</button>` +
+  el.innerHTML = `<button class="ch-nav-btn" onclick="navigateChapter(-1)" ${curIdx <= 0 ? 'disabled' : ''} title="上一�?Ctrl+[">◀</button>` +
     `<span style="padding:0 4px;min-width:28px;text-align:center;color:var(--tx2)">${curIdx + 1}/${chapters.length}</span>` +
-    `<button class="ch-nav-btn" onclick="navigateChapter(1)" ${curIdx >= chapters.length - 1 ? 'disabled' : ''} title="下一章 Ctrl+]">▶</button>`;
+    `<button class="ch-nav-btn" onclick="navigateChapter(1)" ${curIdx >= chapters.length - 1 ? 'disabled' : ''} title="下一�?Ctrl+]">�?/button>`;
 }
 init();
 
