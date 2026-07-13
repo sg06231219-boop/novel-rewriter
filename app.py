@@ -8,7 +8,7 @@
 """
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, StreamingResponse, Response
+from fastapi.responses import HTMLResponse, StreamingResponse, Response, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Optional
@@ -1176,6 +1176,15 @@ async def admin_page():
         return HTMLResponse(content=f.read())
 
 from starlette.staticfiles import StaticFiles
+
+@app.get("/robots.txt")
+async def robots():
+    return FileResponse("static/robots.txt", media_type="text/plain")
+
+@app.get("/sitemap.xml")
+async def sitemap():
+    return FileResponse("static/sitemap.xml", media_type="application/xml")
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 if __name__ == "__main__":
